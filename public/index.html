@@ -1,0 +1,1085 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Biplob Shop - Mobile POS & Inventory</title>
+  <!-- Tailwind CSS via CDN with offline CSS fallback in styles.css -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="bg-gray-100 text-gray-900 min-h-screen flex flex-col font-sans antialiased">
+
+  <!-- TOP APP BAR -->
+  <header class="bg-indigo-900 text-white shadow-md sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+        
+        <!-- BRAND LOGO & INFO -->
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 bg-indigo-500 rounded-lg flex items-center justify-center text-white font-bold shadow-inner">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+            </svg>
+          </div>
+          <div>
+            <div class="flex items-center space-x-2">
+              <h1 class="text-xl font-extrabold tracking-tight">Biplob Shop</h1>
+              <span class="text-xs bg-indigo-700 text-indigo-200 px-2 py-0.5 rounded-full font-medium">Mobile & Accessories</span>
+            </div>
+            <p class="text-xs text-indigo-300">Local POS &amp; IMEI Inventory</p>
+          </div>
+        </div>
+
+        <!-- NAVIGATION TABS -->
+        <nav class="hidden md:flex space-x-1" id="mainNav">
+          <button onclick="switchTab('pos')" id="tabBtn-pos" class="tab-btn active px-3 py-2 rounded-md text-sm font-semibold flex items-center space-x-1.5 transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+            <span>POS Checkout</span>
+            <span class="kbd-hint">F2</span>
+          </button>
+          <button onclick="switchTab('inventory')" id="tabBtn-inventory" class="tab-btn px-3 py-2 rounded-md text-sm font-medium flex items-center space-x-1.5 transition text-indigo-200 hover:text-white hover:bg-indigo-800">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+            <span>Inventory</span>
+            <span class="kbd-hint">F3</span>
+          </button>
+          <button onclick="switchTab('orders')" id="tabBtn-orders" class="tab-btn px-3 py-2 rounded-md text-sm font-medium flex items-center space-x-1.5 transition text-indigo-200 hover:text-white hover:bg-indigo-800">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            <span>Invoices</span>
+          </button>
+          <button onclick="switchTab('reports')" id="tabBtn-reports" class="tab-btn px-3 py-2 rounded-md text-sm font-medium flex items-center space-x-1.5 transition text-indigo-200 hover:text-white hover:bg-indigo-800">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+            <span>Reports</span>
+            <span class="kbd-hint">F4</span>
+          </button>
+        </nav>
+
+        <!-- LAN & SYSTEM STATUS -->
+        <div class="flex items-center space-x-3 text-xs">
+          <div class="hidden lg:flex items-center bg-indigo-800/80 px-2.5 py-1.5 rounded-md border border-indigo-700/50 text-indigo-200" title="Access this POS from other devices on Wi-Fi">
+            <svg class="w-3.5 h-3.5 mr-1.5 text-emerald-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3 5a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2h-2.22l.123.489.804.804A1 1 0 0113 18H7a1 1 0 01-.707-1.707l.804-.804L7.22 15H5a2 2 0 01-2-2V5zm5.771 7H11.23l-.624-2.497A1 1 0 009.638 9h-.276a1 1 0 00-.968.503L7.771 12z" clip-rule="evenodd"/></svg>
+            <span>LAN: <strong class="text-white" id="lanIpDisplay">Local Network Ready</strong></span>
+          </div>
+          <div class="flex items-center space-x-1.5 bg-emerald-900/60 text-emerald-300 px-2 py-1 rounded border border-emerald-700/40">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span class="font-medium">Offline Ready</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Mobile Nav Bar -->
+    <div class="md:hidden flex border-t border-indigo-800 bg-indigo-950 px-2 py-1 justify-around text-xs">
+      <button onclick="switchTab('pos')" class="px-2 py-1.5 font-medium text-white flex flex-col items-center">
+        <span>POS</span>
+      </button>
+      <button onclick="switchTab('inventory')" class="px-2 py-1.5 font-medium text-indigo-300 flex flex-col items-center">
+        <span>Inventory</span>
+      </button>
+      <button onclick="switchTab('orders')" class="px-2 py-1.5 font-medium text-indigo-300 flex flex-col items-center">
+        <span>Invoices</span>
+      </button>
+      <button onclick="switchTab('reports')" class="px-2 py-1.5 font-medium text-indigo-300 flex flex-col items-center">
+        <span>Reports</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN CONTENT CONTAINER -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+
+    <!-- =========================================================
+         TAB 1: POINT OF SALE (POS)
+    ========================================================= -->
+    <section id="tab-pos" class="tab-pane active">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        
+        <!-- LEFT PANEL: CATALOG & SCANNER (7 Cols) -->
+        <div class="lg:col-span-7 space-y-4">
+          
+          <!-- SCANNER & SEARCH BAR -->
+          <div class="bg-white rounded-xl shadow-sm p-4 border border-gray-200">
+            <div class="relative">
+              <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/>
+                </svg>
+              </div>
+              <input
+                type="text"
+                id="posSearchInput"
+                class="w-full pl-11 pr-24 py-3 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm font-medium"
+                placeholder="Scan Barcode / SKU, or type Phone IMEI / Model..."
+                autofocus
+                autocomplete="off"
+              >
+              <div class="absolute inset-y-0 right-0 pr-3 flex items-center space-x-1">
+                <span class="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded font-mono">Enter ↵</span>
+              </div>
+            </div>
+
+            <!-- Category Filter Pills -->
+            <div class="flex items-center space-x-2 mt-3 overflow-x-auto pb-1 text-xs" id="posCategoryPills">
+              <button onclick="filterPosCatalog('all')" class="cat-pill active px-3 py-1.5 rounded-full font-medium bg-indigo-600 text-white whitespace-nowrap">
+                All Items
+              </button>
+              <button onclick="filterPosCatalog('phone')" class="cat-pill px-3 py-1.5 rounded-full font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 whitespace-nowrap flex items-center space-x-1">
+                <span>📱 Mobile Handsets</span>
+              </button>
+              <!-- Dynamic Category Pills Injected by JS -->
+            </div>
+          </div>
+
+          <!-- PRODUCT LIST / GRID -->
+          <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div class="px-4 py-3 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+              <span class="text-xs font-bold text-gray-600 uppercase tracking-wider" id="posCatalogCount">Available Items</span>
+              <span class="text-xs text-gray-500">Click item or press Enter to add to cart</span>
+            </div>
+            
+            <div class="p-3 max-h-[520px] overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-3" id="posProductGrid">
+              <!-- Rendered via app.js -->
+              <div class="text-center py-12 text-gray-400 col-span-2">Loading products...</div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- RIGHT PANEL: CART & CHECKOUT (5 Cols) -->
+        <div class="lg:col-span-5 bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col h-[740px] sticky top-20">
+          
+          <!-- CART HEADER -->
+          <div class="p-4 border-b border-gray-200 flex items-center justify-between bg-gray-50 rounded-t-xl">
+            <div class="flex items-center space-x-2">
+              <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/>
+              </svg>
+              <h2 class="font-bold text-gray-800">Checkout Cart</h2>
+              <span id="cartItemCountBadge" class="bg-indigo-100 text-indigo-800 text-xs px-2 py-0.5 rounded-full font-bold">0</span>
+            </div>
+            <button onclick="clearCart()" class="text-xs text-red-600 hover:text-red-800 font-medium transition">
+              Clear All
+            </button>
+          </div>
+
+          <!-- CUSTOMER DETAILS (Expandable/Compact) -->
+          <div class="p-3 bg-indigo-50/50 border-b border-indigo-100 text-xs grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-gray-600 font-medium mb-0.5">Customer Name</label>
+              <input type="text" id="custNameInput" class="w-full px-2.5 py-1.5 bg-white border border-gray-300 rounded text-xs focus:ring-1 focus:ring-indigo-500" value="Walk-in Customer">
+            </div>
+            <div>
+              <label class="block text-gray-600 font-medium mb-0.5">Mobile / Contact</label>
+              <input type="text" id="custPhoneInput" class="w-full px-2.5 py-1.5 bg-white border border-gray-300 rounded text-xs focus:ring-1 focus:ring-indigo-500" placeholder="017xxxxxxxx">
+            </div>
+          </div>
+
+          <!-- CART ITEMS LIST -->
+          <div class="flex-1 overflow-y-auto p-3 space-y-2 divide-y divide-gray-100" id="cartItemList">
+            <!-- Empty state -->
+            <div class="text-center py-16 text-gray-400">
+              <svg class="w-12 h-12 mx-auto mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/>
+              </svg>
+              <p class="text-sm font-medium">Cart is empty</p>
+              <p class="text-xs text-gray-400 mt-1">Scan a barcode or click items to begin sale</p>
+            </div>
+          </div>
+
+          <!-- CART TOTALS & PAYMENT FOOTER -->
+          <div class="p-4 bg-gray-50 border-t border-gray-200 rounded-b-xl space-y-3">
+            
+            <div class="space-y-1.5 text-xs text-gray-600">
+              <div class="flex justify-between">
+                <span>Subtotal</span>
+                <span class="font-medium text-gray-900" id="cartSubtotal">৳ 0.00</span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span>Discount</span>
+                <div class="flex items-center space-x-1">
+                  <span>৳</span>
+                  <input
+                    type="number"
+                    id="cartDiscountInput"
+                    min="0"
+                    step="1"
+                    value="0"
+                    oninput="updateCartTotals()"
+                    class="w-20 px-2 py-1 text-right bg-white border border-gray-300 rounded text-xs font-semibold focus:ring-1 focus:ring-indigo-500"
+                  >
+                </div>
+              </div>
+              <div class="flex justify-between text-base font-extrabold text-gray-900 pt-2 border-t border-gray-200">
+                <span>Total Due</span>
+                <span class="text-indigo-600 text-lg" id="cartGrandTotal">৳ 0.00</span>
+              </div>
+            </div>
+
+            <!-- PAYMENT METHOD SELECTOR -->
+            <div>
+              <label class="block text-xs font-bold text-gray-700 mb-1">Payment Method</label>
+              <div class="grid grid-cols-5 gap-1" id="paymentMethodBtns">
+                <button type="button" onclick="selectPaymentMethod('Cash')" class="pay-method-btn active px-1.5 py-1.5 rounded border text-xs font-medium text-center bg-indigo-600 text-white border-indigo-600">
+                  Cash
+                </button>
+                <button type="button" onclick="selectPaymentMethod('Card')" class="pay-method-btn px-1.5 py-1.5 rounded border text-xs font-medium text-center bg-white text-gray-700 border-gray-300 hover:bg-gray-100">
+                  Card
+                </button>
+                <button type="button" onclick="selectPaymentMethod('Mobile Banking')" class="pay-method-btn px-1.5 py-1.5 rounded border text-xs font-medium text-center bg-white text-gray-700 border-gray-300 hover:bg-gray-100">
+                  bKash
+                </button>
+                <button type="button" onclick="selectPaymentMethod('Mixed')" class="pay-method-btn px-1.5 py-1.5 rounded border text-xs font-medium text-center bg-white text-gray-700 border-gray-300 hover:bg-gray-100">
+                  Mixed
+                </button>
+                <button type="button" onclick="selectPaymentMethod('EMI')" class="pay-method-btn px-1.5 py-1.5 rounded border text-xs font-bold text-center bg-white text-indigo-700 border-indigo-300 hover:bg-indigo-50">
+                  💳 EMI
+                </button>
+              </div>
+            </div>
+
+            <!-- EMI CONFIGURATION DRAWER (DYNAMIC) -->
+            <div id="emiConfigBox" class="hidden p-3 bg-indigo-50/90 rounded-lg border border-indigo-200 text-xs space-y-2.5">
+              <div class="flex items-center justify-between pb-1.5 border-b border-indigo-200">
+                <span class="font-extrabold text-indigo-950 flex items-center space-x-1">
+                  <span>💳 EMI &amp; Installment Options</span>
+                </span>
+                <div class="flex items-center space-x-3 text-[11px]">
+                  <label class="flex items-center space-x-1 cursor-pointer font-bold text-indigo-900">
+                    <input type="radio" name="emiMode" value="bank" checked onchange="handleEmiModeChange()" class="text-indigo-600">
+                    <span>Bank Card EMI</span>
+                  </label>
+                  <label class="flex items-center space-x-1 cursor-pointer font-bold text-indigo-900">
+                    <input type="radio" name="emiMode" value="shop" onchange="handleEmiModeChange()" class="text-indigo-600">
+                    <span>Shop Installment</span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- 1. BANK CARD EMI FIELDS -->
+              <div id="bankEmiFields" class="space-y-2">
+                <div class="grid grid-cols-2 gap-2">
+                  <div>
+                    <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">Partner Bank</label>
+                    <select id="bankEmiSelect" onchange="calculateEmiPreview()" class="w-full px-2 py-1 bg-white border border-gray-300 rounded text-xs focus:ring-1 focus:ring-indigo-500 font-medium">
+                      <option value="City Bank (Amex/Visa)">City Bank (Amex / Visa)</option>
+                      <option value="BRAC Bank">BRAC Bank</option>
+                      <option value="Eastern Bank (EBL)">Eastern Bank (EBL)</option>
+                      <option value="Standard Chartered">Standard Chartered</option>
+                      <option value="Dutch-Bangla Bank">Dutch-Bangla Bank</option>
+                      <option value="Mutual Trust Bank (MTB)">Mutual Trust Bank (MTB)</option>
+                      <option value="Premier Bank">Premier Bank</option>
+                      <option value="Prime Bank">Prime Bank</option>
+                      <option value="United Commercial Bank (UCB)">UCB</option>
+                      <option value="LankaBangla Finance">LankaBangla Finance</option>
+                      <option value="Other Bank Card">Other Bank Card</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">EMI Tenure</label>
+                    <select id="bankEmiTenure" onchange="calculateEmiPreview()" class="w-full px-2 py-1 bg-white border border-gray-300 rounded text-xs focus:ring-1 focus:ring-indigo-500 font-bold">
+                      <option value="3">3 Months</option>
+                      <option value="6" selected>6 Months</option>
+                      <option value="9">9 Months</option>
+                      <option value="12">12 Months</option>
+                      <option value="18">18 Months</option>
+                      <option value="24">24 Months</option>
+                      <option value="36">36 Months</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">Card Last 4 Digits (Optional)</label>
+                  <input type="text" id="bankEmiCardLast4" maxlength="4" placeholder="e.g. 5432" class="w-full px-2 py-1 bg-white border border-gray-300 rounded text-xs font-mono">
+                </div>
+              </div>
+
+              <!-- 2. SHOP IN-HOUSE INSTALLMENT FIELDS -->
+              <div id="shopEmiFields" class="hidden space-y-2">
+                <div class="grid grid-cols-2 gap-2">
+                  <div>
+                    <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">Down Payment (৳) *</label>
+                    <input type="number" id="shopEmiDownPayment" min="0" step="500" value="0" oninput="calculateEmiPreview()" class="w-full px-2 py-1 bg-white border border-gray-300 rounded text-xs font-bold text-emerald-700" placeholder="0.00">
+                  </div>
+                  <div>
+                    <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">Installment Plan</label>
+                    <select id="shopEmiTenure" onchange="calculateEmiPreview()" class="w-full px-2 py-1 bg-white border border-gray-300 rounded text-xs focus:ring-1 focus:ring-indigo-500 font-bold">
+                      <option value="2">2 Months</option>
+                      <option value="3" selected>3 Months</option>
+                      <option value="4">4 Months</option>
+                      <option value="6">6 Months</option>
+                      <option value="9">9 Months</option>
+                      <option value="12">12 Months</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                  <div>
+                    <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">Customer NID / ID *</label>
+                    <input type="text" id="shopEmiNid" placeholder="National ID / Passport" class="w-full px-2 py-1 bg-white border border-gray-300 rounded text-xs font-medium">
+                  </div>
+                  <div>
+                    <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">Down Payment Via</label>
+                    <select id="shopEmiDownPayMethod" class="w-full px-2 py-1 bg-white border border-gray-300 rounded text-xs">
+                      <option value="Cash">Cash</option>
+                      <option value="Mobile Banking">bKash / Nagad</option>
+                      <option value="Card">Card</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">Guarantor / Reference Contact</label>
+                  <input type="text" id="shopEmiGuarantor" placeholder="e.g. Brother / Relative: 017xxxxxxxx" class="w-full px-2 py-1 bg-white border border-gray-300 rounded text-xs">
+                </div>
+              </div>
+
+              <!-- LIVE EMI CALCULATION PREVIEW -->
+              <div id="emiCalculationSummary" class="p-2 bg-white rounded border border-indigo-200 text-xs">
+                <!-- Dynamically updated via calculateEmiPreview() -->
+              </div>
+            </div>
+
+            <!-- CHECKOUT ACTION BUTTONS -->
+            <div class="grid grid-cols-2 gap-2 pt-1">
+              <button
+                type="button"
+                onclick="submitCheckout(true)"
+                id="btnCheckoutPrint"
+                class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-3 rounded-lg text-sm shadow flex items-center justify-center space-x-1 transition disabled:opacity-50"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                <span>Pay &amp; Receipt</span>
+              </button>
+              <button
+                type="button"
+                onclick="submitCheckout(false)"
+                id="btnCheckoutOnly"
+                class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-3 rounded-lg text-sm shadow flex items-center justify-center space-x-1 transition disabled:opacity-50"
+              >
+                <span>Complete Sale</span>
+              </button>
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+    <!-- =========================================================
+         TAB 2: INVENTORY MANAGEMENT
+    ========================================================= -->
+    <section id="tab-inventory" class="tab-pane hidden space-y-6">
+      
+      <!-- SUB-NAV & ACTIONS HEADER -->
+      <div class="bg-white rounded-xl shadow-sm p-4 border border-gray-200 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        
+        <!-- SUB-TABS: ACCESSORIES vs USED PHONES -->
+        <div class="flex space-x-2 border-b md:border-b-0 pb-2 md:pb-0">
+          <button onclick="switchInventorySubTab('accessories')" id="subTabBtn-accessories" class="px-4 py-2 text-sm font-bold rounded-lg bg-indigo-600 text-white shadow-sm flex items-center space-x-2">
+            <span>📦 Accessories &amp; General</span>
+            <span id="invAccCountBadge" class="bg-indigo-800 text-indigo-100 text-xs px-2 py-0.5 rounded-full">0</span>
+          </button>
+          <button onclick="switchInventorySubTab('phones')" id="subTabBtn-phones" class="px-4 py-2 text-sm font-bold rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 flex items-center space-x-2">
+            <span>📱 Mobile Handsets (IMEI)</span>
+            <span id="invPhoneCountBadge" class="bg-gray-200 text-gray-800 text-xs px-2 py-0.5 rounded-full">0</span>
+          </button>
+        </div>
+
+        <!-- SEARCH & ACTION BUTTONS -->
+        <div class="flex flex-wrap items-center gap-2">
+          <div class="relative flex-1 sm:w-64">
+            <input
+              type="text"
+              id="invSearchInput"
+              oninput="debouncedSearchInventory()"
+              placeholder="Search by name, SKU, or IMEI..."
+              class="w-full pl-9 pr-3 py-1.5 text-xs bg-gray-50 border border-gray-300 rounded-lg focus:ring-1 focus:ring-indigo-500 focus:bg-white"
+            >
+            <div class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-gray-400">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            </div>
+          </div>
+
+          <button onclick="openAddItemModal()" id="btnAddItem" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-2 px-3 rounded-lg flex items-center space-x-1 shadow-sm transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            <span id="btnAddItemText">Add Accessory</span>
+          </button>
+
+          <button onclick="exportInventoryCsv()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold py-2 px-3 rounded-lg flex items-center space-x-1 border border-gray-300 transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+            <span>CSV Export</span>
+          </button>
+
+          <button onclick="clearAllDemoData()" class="bg-red-50 hover:bg-red-100 text-red-700 text-xs font-semibold py-2 px-3 rounded-lg flex items-center space-x-1 border border-red-200 transition" title="Clear sample demo products to start with empty inventory">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+            <span>Clear Demo Data</span>
+          </button>
+        </div>
+
+      </div>
+
+      <!-- INVENTORY VIEW 1: ACCESSORIES & GENERAL STOCK -->
+      <div id="subView-accessories" class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div class="p-3 bg-gray-50 border-b border-gray-200 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div class="flex items-center space-x-2">
+            <span class="font-bold text-gray-700">Filter Category:</span>
+            <select id="invCatFilter" onchange="loadAccessoriesTable()" class="px-2 py-1 bg-white border border-gray-300 rounded text-xs focus:ring-1 focus:ring-indigo-500">
+              <option value="">All Categories</option>
+            </select>
+          </div>
+          <div class="flex items-center space-x-2">
+            <label class="flex items-center space-x-1 cursor-pointer">
+              <input type="checkbox" id="invLowStockOnly" onchange="loadAccessoriesTable()" class="rounded text-indigo-600 focus:ring-indigo-500">
+              <span class="text-red-700 font-semibold">⚠️ Show Low Stock Only</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200 text-left text-xs">
+            <thead class="bg-gray-100 text-gray-700 font-semibold uppercase tracking-wider">
+              <tr>
+                <th class="px-4 py-3">SKU / Barcode</th>
+                <th class="px-4 py-3">Title / Description</th>
+                <th class="px-4 py-3">Category</th>
+                <th class="px-4 py-3">Tak / Location</th>
+                <th class="px-4 py-3 text-right">Cost Price</th>
+                <th class="px-4 py-3 text-right">Selling Price</th>
+                <th class="px-4 py-3 text-center">In-Stock</th>
+                <th class="px-4 py-3 text-center">Alert Limit</th>
+                <th class="px-4 py-3 text-center">Status</th>
+                <th class="px-4 py-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="accessoriesTableBody" class="divide-y divide-gray-200">
+              <tr><td colspan="10" class="text-center py-8 text-gray-400">Loading accessories...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- INVENTORY VIEW 2: MOBILE HANDSETS (IMEI TRACKING) -->
+      <div id="subView-phones" class="hidden bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div class="p-3 bg-gray-50 border-b border-gray-200 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div class="flex flex-wrap items-center gap-3">
+            <div class="flex items-center space-x-1">
+              <span class="font-bold text-gray-700">Status:</span>
+              <select id="phoneStatusFilter" onchange="loadPhonesTable()" class="px-2 py-1 bg-white border border-gray-300 rounded text-xs focus:ring-1 focus:ring-indigo-500">
+                <option value="In-Stock">In-Stock Only</option>
+                <option value="Sold">Sold</option>
+                <option value="">All Handsets</option>
+              </select>
+            </div>
+            <div class="flex items-center space-x-1">
+              <span class="font-bold text-gray-700">Brand:</span>
+              <select id="phoneBrandFilter" onchange="loadPhonesTable()" class="px-2 py-1 bg-white border border-gray-300 rounded text-xs focus:ring-1 focus:ring-indigo-500">
+                <option value="">All Brands</option>
+                <option value="Apple">Apple</option>
+                <option value="Samsung">Samsung</option>
+                <option value="Google">Google</option>
+                <option value="Xiaomi">Xiaomi</option>
+                <option value="OnePlus">OnePlus</option>
+              </select>
+            </div>
+            <div class="flex items-center space-x-1">
+              <span class="font-bold text-gray-700">Condition:</span>
+              <select id="phoneGradeFilter" onchange="loadPhonesTable()" class="px-2 py-1 bg-white border border-gray-300 rounded text-xs focus:ring-1 focus:ring-indigo-500 font-medium">
+                <option value="">All Handsets</option>
+                <option value="Brand New">✨ Brand New (Sealed)</option>
+                <option value="Grade A">📱 Used - Grade A</option>
+                <option value="Grade B">📱 Used - Grade B</option>
+                <option value="Grade C">📱 Used - Grade C</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200 text-left text-xs">
+            <thead class="bg-gray-100 text-gray-700 font-semibold uppercase tracking-wider">
+              <tr>
+                <th class="px-4 py-3">IMEI Number</th>
+                <th class="px-4 py-3">Brand &amp; Model</th>
+                <th class="px-4 py-3">Storage / Color</th>
+                <th class="px-4 py-3 text-center">Type / Condition</th>
+                <th class="px-4 py-3 text-center">Warranty / Battery</th>
+                <th class="px-4 py-3 text-right">Cost Price</th>
+                <th class="px-4 py-3 text-right">Selling Price</th>
+                <th class="px-4 py-3 text-right">Margin Est.</th>
+                <th class="px-4 py-3 text-center">Status</th>
+                <th class="px-4 py-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="phonesTableBody" class="divide-y divide-gray-200">
+              <tr><td colspan="10" class="text-center py-8 text-gray-400">Loading used handsets...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- =========================================================
+         TAB 3: INVOICES & ORDERS HISTORY
+    ========================================================= -->
+    <section id="tab-orders" class="tab-pane hidden space-y-6">
+      
+      <div class="bg-white rounded-xl shadow-sm p-4 border border-gray-200 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+        <div class="flex items-center space-x-3">
+          <h2 class="text-base font-bold text-gray-800">Sales Transactions &amp; Receipts</h2>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <select id="orderEmiFilter" onchange="loadOrdersTable()" class="px-2.5 py-1.5 text-xs bg-white border border-gray-300 rounded-lg focus:ring-1 focus:ring-indigo-500 font-semibold text-gray-700">
+            <option value="">All Transactions</option>
+            <option value="1">💳 All EMI &amp; Installments</option>
+            <option value="active_due">⚠️ Active Installment Dues</option>
+          </select>
+          <input
+            type="text"
+            id="orderSearchInput"
+            oninput="debouncedSearchOrders()"
+            placeholder="Search invoice #, customer, NID or phone..."
+            class="px-3 py-1.5 text-xs bg-gray-50 border border-gray-300 rounded-lg w-64 focus:bg-white focus:ring-1 focus:ring-indigo-500"
+          >
+          <button onclick="exportSalesCsv()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold py-2 px-3 rounded-lg border border-gray-300 transition">
+            Export Sales CSV
+          </button>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200 text-left text-xs">
+            <thead class="bg-gray-100 text-gray-700 font-semibold uppercase tracking-wider">
+              <tr>
+                <th class="px-4 py-3">Invoice #</th>
+                <th class="px-4 py-3">Date &amp; Time</th>
+                <th class="px-4 py-3">Customer</th>
+                <th class="px-4 py-3">Payment / Plan</th>
+                <th class="px-4 py-3 text-right">Total Device Price</th>
+                <th class="px-4 py-3 text-right">Discount</th>
+                <th class="px-4 py-3 text-right">Due / Paid</th>
+                <th class="px-4 py-3 text-right">Net Profit</th>
+                <th class="px-4 py-3 text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="ordersTableBody" class="divide-y divide-gray-200">
+              <tr><td colspan="9" class="text-center py-8 text-gray-400">Loading sales records...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- =========================================================
+         TAB 4: REPORTS & ANALYTICS
+    ========================================================= -->
+    <section id="tab-reports" class="tab-pane hidden space-y-6">
+      
+      <!-- REPORT CONTROLS -->
+      <div class="bg-white rounded-xl shadow-sm p-4 border border-gray-200 flex flex-wrap items-center justify-between gap-4">
+        <div class="flex items-center space-x-3">
+          <span class="text-xs font-bold text-gray-700">Reporting Period:</span>
+          <select id="reportMonthSelect" onchange="loadReports()" class="px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-xs font-medium focus:ring-1 focus:ring-indigo-500">
+            <option value="1">January</option>
+            <option value="2">February</option>
+            <option value="3">March</option>
+            <option value="4">April</option>
+            <option value="5">May</option>
+            <option value="6">June</option>
+            <option value="7">July</option>
+            <option value="8">August</option>
+            <option value="9">September</option>
+            <option value="10">October</option>
+            <option value="11">November</option>
+            <option value="12">December</option>
+          </select>
+          <select id="reportYearSelect" onchange="loadReports()" class="px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-xs font-medium focus:ring-1 focus:ring-indigo-500">
+            <option value="2026">2026</option>
+            <option value="2025">2025</option>
+            <option value="2024">2024</option>
+          </select>
+        </div>
+
+        <div class="flex items-center space-x-2">
+          <button onclick="exportSalesCsv()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-2 px-3 rounded-lg shadow-sm transition flex items-center space-x-1">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            <span>Export Period Sales CSV</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- KPI SUMMARY CARDS -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        
+        <div class="bg-white rounded-xl shadow-sm p-4 border border-gray-200">
+          <div class="flex items-center justify-between text-gray-500 text-xs font-semibold">
+            <span>Total Monthly Revenue</span>
+            <span class="text-indigo-600 bg-indigo-50 p-1.5 rounded-lg">৳</span>
+          </div>
+          <div class="mt-2 text-2xl font-extrabold text-gray-900" id="kpiRevenue">৳ 0.00</div>
+          <div class="mt-1 text-xs text-gray-500 flex items-center justify-between">
+            <span>Orders: <strong id="kpiOrdersCount">0</strong></span>
+            <span>Items Sold: <strong id="kpiItemsSold">0</strong></span>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm p-4 border border-gray-200">
+          <div class="flex items-center justify-between text-gray-500 text-xs font-semibold">
+            <span>Total Cost of Goods (COGS)</span>
+            <span class="text-amber-600 bg-amber-50 p-1.5 rounded-lg">📉</span>
+          </div>
+          <div class="mt-2 text-2xl font-extrabold text-gray-900" id="kpiCogs">৳ 0.00</div>
+          <div class="mt-1 text-xs text-gray-500">Purchase cost of sold items</div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm p-4 border border-emerald-200 bg-emerald-50/20">
+          <div class="flex items-center justify-between text-emerald-800 text-xs font-semibold">
+            <span>Net Gross Profit</span>
+            <span class="text-emerald-600 bg-emerald-100 p-1.5 rounded-lg">📈</span>
+          </div>
+          <div class="mt-2 text-2xl font-extrabold text-emerald-700" id="kpiProfit">৳ 0.00</div>
+          <div class="mt-1 text-xs text-emerald-600 font-medium">
+            Margin: <span id="kpiMarginPct" class="font-bold">0%</span>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm p-4 border border-gray-200">
+          <div class="flex items-center justify-between text-gray-500 text-xs font-semibold">
+            <span>In-Stock Inventory Value</span>
+            <span class="text-blue-600 bg-blue-50 p-1.5 rounded-lg">🏷️</span>
+          </div>
+          <div class="mt-2 text-2xl font-extrabold text-gray-900" id="kpiStockRetail">৳ 0.00</div>
+          <div class="mt-1 text-xs text-gray-500">
+            Cost Basis: <strong id="kpiStockCost">৳ 0.00</strong>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- TWO COLUMN ANALYSIS: TOP ACCESSORIES & HANDSET STATS -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
+        <!-- Top Selling Accessories -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+          <h3 class="text-sm font-bold text-gray-900 mb-3 flex items-center space-x-2">
+            <span>🔥 Top-Selling Accessories</span>
+          </h3>
+          <div class="overflow-x-auto">
+            <table class="min-w-full text-xs text-left">
+              <thead class="bg-gray-50 text-gray-600 font-semibold border-b">
+                <tr>
+                  <th class="py-2 px-3">Item Title</th>
+                  <th class="py-2 px-3 text-center">Units Sold</th>
+                  <th class="py-2 px-3 text-right">Revenue</th>
+                </tr>
+              </thead>
+              <tbody id="topAccessoriesTable" class="divide-y divide-gray-100">
+                <tr><td colspan="3" class="py-4 text-center text-gray-400">No data available for selected period</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Handset Turnaround Stats -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 space-y-4">
+          <h3 class="text-sm font-bold text-gray-900 flex items-center space-x-2">
+            <span>📱 Mobile Handset Inventory &amp; Turnaround</span>
+          </h3>
+          <div class="grid grid-cols-2 gap-3 text-xs">
+            <div class="p-3 bg-gray-50 rounded-lg border border-gray-200">
+              <span class="text-gray-500 block">Handsets Currently In-Stock</span>
+              <span class="text-xl font-extrabold text-indigo-600" id="statHandsetsInStock">0</span>
+              <span class="text-gray-400 block text-[11px] mt-0.5">Asset: <span id="statHandsetCostValue">৳ 0</span></span>
+            </div>
+            <div class="p-3 bg-gray-50 rounded-lg border border-gray-200">
+              <span class="text-gray-500 block">Total Handsets Sold</span>
+              <span class="text-xl font-extrabold text-emerald-600" id="statHandsetsSold">0</span>
+              <span class="text-gray-400 block text-[11px] mt-0.5">All-time turnover</span>
+            </div>
+          </div>
+          <div class="p-3 bg-indigo-50/60 rounded-lg border border-indigo-100 text-xs text-indigo-900">
+            <p class="font-bold">IMEI &amp; Warranty Tracking</p>
+            <p class="text-indigo-700 text-[11px] mt-0.5">Every handset sale (Brand New or Pre-Owned) records the exact hardware serial number (IMEI) and warranty period on the customer's invoice for warranty and legal compliance.</p>
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- =========================================================
+       MODAL 1: ADD / EDIT ACCESSORY
+  ========================================================= -->
+  <dialog id="modalItem" class="rounded-xl shadow-2xl p-0 backdrop:bg-black/50 border border-gray-200 w-full max-w-lg">
+    <div class="bg-white rounded-xl overflow-hidden">
+      <div class="px-6 py-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+        <h3 class="font-bold text-gray-900" id="modalItemTitle">Add New Accessory</h3>
+        <button onclick="closeModal('modalItem')" class="text-gray-400 hover:text-gray-600">✕</button>
+      </div>
+
+      <form id="itemForm" onsubmit="handleSaveItem(event)" class="p-6 space-y-4 text-xs">
+        <input type="hidden" id="itemId">
+
+        <!-- 1. PRODUCT TITLE FIRST -->
+        <div>
+          <label class="block font-bold text-gray-700 mb-1">Product Title / Name *</label>
+          <input
+            type="text"
+            id="itemTitle"
+            required
+            oninput="if(!document.getElementById('itemSku').value) generateSmartSku()"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-indigo-500 text-sm font-medium"
+            placeholder="e.g. iPhone 15 Pro Max Silicone Case"
+          >
+        </div>
+
+        <!-- 2. SKU / BARCODE WITH SMART AUTO-GENERATE -->
+        <div>
+          <div class="flex justify-between items-center mb-1">
+            <label class="font-bold text-gray-700">SKU / Barcode *</label>
+            <button
+              type="button"
+              onclick="generateSmartSku()"
+              class="text-indigo-600 hover:text-indigo-800 font-bold flex items-center space-x-1"
+              title="Generate a smart SKU code from the product name"
+            >
+              <span>⚡ Auto-Generate from Name</span>
+            </button>
+          </div>
+          <input
+            type="text"
+            id="itemSku"
+            required
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-indigo-500 font-mono text-sm font-semibold text-gray-800"
+            placeholder="e.g. IPH15-SIL-482"
+          >
+        </div>
+
+        <!-- 3. CATEGORY WITH INLINE ADD OPTION -->
+        <div>
+          <div class="flex justify-between items-center mb-1">
+            <label class="font-bold text-gray-700">Category *</label>
+            <button
+              type="button"
+              onclick="toggleInlineCategoryBox(true)"
+              class="text-emerald-700 hover:text-emerald-900 font-bold flex items-center space-x-0.5"
+            >
+              <span>+ Add New Category</span>
+            </button>
+          </div>
+          <select id="itemCategory" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-indigo-500">
+            <!-- Populated via JS -->
+          </select>
+
+          <!-- Inline Category Input Drawer -->
+          <div id="inlineCategoryBox" class="hidden mt-2 p-2.5 bg-indigo-50 rounded-lg border border-indigo-200">
+            <label class="block text-[11px] font-bold text-indigo-900 mb-1">New Category Name</label>
+            <div class="flex space-x-1.5">
+              <input
+                type="text"
+                id="inlineCategoryInput"
+                placeholder="e.g. Smart Watches, Lens Protectors"
+                class="flex-1 px-2.5 py-1.5 bg-white border border-gray-300 rounded text-xs focus:ring-1 focus:ring-indigo-500"
+                onkeydown="if(event.key==='Enter'){event.preventDefault();saveInlineCategory();}"
+              >
+              <button
+                type="button"
+                onclick="saveInlineCategory()"
+                class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs px-3 py-1.5 rounded transition"
+              >
+                Add
+              </button>
+              <button
+                type="button"
+                onclick="toggleInlineCategoryBox(false)"
+                class="bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs px-2 py-1.5 rounded transition"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. TAK / RACK / SHELF LOCATION (OPTIONAL) -->
+        <div>
+          <div class="flex justify-between items-center mb-1">
+            <label class="font-bold text-gray-700">Tak / Rack / Shelf Location</label>
+            <span class="text-gray-400 font-normal text-[11px] italic">Optional</span>
+          </div>
+          <input
+            type="text"
+            id="itemRack"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-indigo-500"
+            placeholder="e.g. Tak A-3, Drawer 2, Shelf 4, Glass Counter"
+          >
+        </div>
+
+        <!-- 5. PURCHASE COST & SELLING PRICE -->
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-bold text-gray-700 mb-1">Purchase Cost (৳) *</label>
+            <input type="number" id="itemCost" step="0.01" min="0" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-indigo-500">
+          </div>
+          <div>
+            <label class="block font-bold text-gray-700 mb-1">Selling Price (৳) *</label>
+            <input type="number" id="itemPrice" step="0.01" min="0" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-indigo-500">
+          </div>
+        </div>
+
+        <!-- 6. STOCK & ALERT THRESHOLD -->
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-bold text-gray-700 mb-1">Initial Stock Quantity *</label>
+            <input type="number" id="itemStock" min="0" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-indigo-500">
+          </div>
+          <div>
+            <label class="block font-bold text-gray-700 mb-1">Low Stock Alert Limit</label>
+            <input type="number" id="itemAlertLimit" min="1" value="5" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-indigo-500">
+          </div>
+        </div>
+
+        <div class="pt-3 border-t flex justify-end space-x-2">
+          <button type="button" onclick="closeModal('modalItem')" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 font-medium">Cancel</button>
+          <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold shadow-sm">Save Accessory</button>
+        </div>
+      </form>
+    </div>
+  </dialog>
+
+  <!-- =========================================================
+       MODAL 2: ADD / EDIT USED PHONE (IMEI INTAKE)
+  ========================================================= -->
+  <dialog id="modalPhone" class="rounded-xl shadow-2xl p-0 backdrop:bg-black/50 border border-gray-200 w-full max-w-lg">
+    <div class="bg-white rounded-xl overflow-hidden">
+      <div class="px-6 py-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+        <h3 class="font-bold text-gray-900" id="modalPhoneTitle">Intake Mobile Handset (IMEI Tracking)</h3>
+        <button onclick="closeModal('modalPhone')" class="text-gray-400 hover:text-gray-600">✕</button>
+      </div>
+
+      <form id="phoneForm" onsubmit="handleSavePhone(event)" class="p-6 space-y-4 text-xs">
+        <input type="hidden" id="phoneId">
+
+        <div>
+          <label class="block font-bold text-gray-700 mb-1">IMEI Number (Unique 15-digits) *</label>
+          <input
+            type="text"
+            id="phoneImei"
+            required
+            maxlength="18"
+            onblur="checkImeiDuplicate(this.value)"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-indigo-500 font-mono text-sm"
+            placeholder="Scan barcode or type 15-digit IMEI"
+          >
+          <p id="imeiFeedback" class="text-[11px] mt-1 text-gray-500">Must be unique per handset device.</p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-bold text-gray-700 mb-1">Brand *</label>
+            <input type="text" id="phoneBrand" required placeholder="Apple, Samsung, etc." class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-indigo-500">
+          </div>
+          <div>
+            <label class="block font-bold text-gray-700 mb-1">Model *</label>
+            <input type="text" id="phoneModel" required placeholder="iPhone 15 Pro, S24, etc." class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-indigo-500">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-bold text-gray-700 mb-1">Storage Capacity</label>
+            <select id="phoneStorage" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-indigo-500 font-medium">
+              <option value="64GB">64GB</option>
+              <option value="128GB" selected>128GB</option>
+              <option value="256GB">256GB</option>
+              <option value="512GB">512GB</option>
+              <option value="1TB">1TB</option>
+            </select>
+          </div>
+          <div>
+            <label class="block font-bold text-gray-700 mb-1">Color</label>
+            <input type="text" id="phoneColor" placeholder="Natural Titanium, Black, etc." class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-indigo-500">
+          </div>
+        </div>
+
+        <!-- CONDITION GRADE & WARRANTY COVERAGE -->
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-bold text-gray-700 mb-1">Condition / Device Type *</label>
+            <select id="phoneGrade" onchange="handlePhoneConditionChange()" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-indigo-500 font-semibold text-gray-800">
+              <option value="Brand New (Sealed)" selected>✨ Brand New (Sealed Box)</option>
+              <option value="Grade A">📱 Used - Grade A (Like New)</option>
+              <option value="Grade B">📱 Used - Grade B (Minor Scratches)</option>
+              <option value="Grade C">📱 Used - Grade C (Heavy Wear)</option>
+              <option value="Refurbished">🔄 Refurbished</option>
+            </select>
+          </div>
+          <div>
+            <label class="block font-bold text-gray-700 mb-1">Warranty Coverage</label>
+            <select id="phoneWarranty" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-indigo-500 font-medium">
+              <option value="Official 1-Year Brand Warranty" selected>Official 1-Year Brand Warranty</option>
+              <option value="Unofficial / International 1-Year">Unofficial / International 1-Year</option>
+              <option value="Shop Service Warranty (30 Days)">Shop Service Warranty (30 Days)</option>
+              <option value="Shop Service Warranty (90 Days)">Shop Service Warranty (90 Days)</option>
+              <option value="7 Days Checking Warranty">7 Days Checking Warranty</option>
+              <option value="No Warranty">No Warranty</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- BATTERY HEALTH (DYNAMIC: PRE-OWNED ONLY) -->
+        <div id="phoneBatteryContainer" class="hidden">
+          <div class="p-3 bg-amber-50 rounded-lg border border-amber-200 flex items-center justify-between">
+            <div>
+              <label class="block font-bold text-amber-900 mb-0.5">Battery Health (%)</label>
+              <p class="text-[11px] text-amber-700">Health percentage for pre-owned handsets</p>
+            </div>
+            <div class="w-28">
+              <input type="number" id="phoneBattery" min="40" max="100" value="88" class="w-full px-3 py-1.5 bg-white border border-amber-300 rounded-lg text-center font-bold text-sm focus:ring-1 focus:ring-amber-500">
+            </div>
+          </div>
+        </div>
+
+        <!-- BRAND NEW BADGE BANNER -->
+        <div id="phoneBrandNewBanner" class="p-2.5 bg-blue-50 border border-blue-200 rounded-lg text-blue-800 flex items-center space-x-2">
+          <span class="text-base">✨</span>
+          <p class="text-[11px] leading-tight font-medium">Brand New device with 100% battery capacity, intact seal, and warranty tracking via unique IMEI.</p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-bold text-gray-700 mb-1">Purchase Cost (৳) *</label>
+            <input type="number" id="phoneCost" step="0.01" min="0" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-indigo-500">
+          </div>
+          <div>
+            <label class="block font-bold text-gray-700 mb-1">Selling Price (৳) *</label>
+            <input type="number" id="phonePrice" step="0.01" min="0" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-indigo-500">
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-bold text-gray-700 mb-1">Device Notes / Supplier Details</label>
+          <input type="text" id="phoneNotes" placeholder="Official distributor, sealed pack, invoice ref, etc." class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-indigo-500">
+        </div>
+
+        <div class="pt-3 border-t flex justify-end space-x-2">
+          <button type="button" onclick="closeModal('modalPhone')" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 font-medium">Cancel</button>
+          <button type="submit" id="btnSavePhone" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold shadow-sm">Save Handset</button>
+        </div>
+      </form>
+    </div>
+  </dialog>
+
+  <!-- =========================================================
+       MODAL: COLLECT EMI INSTALLMENT
+  ========================================================= -->
+  <dialog id="modalCollectEmi" class="rounded-xl shadow-2xl p-0 backdrop:bg-black/60 border border-gray-200 w-full max-w-md">
+    <div class="bg-white rounded-xl overflow-hidden">
+      <div class="px-5 py-3.5 bg-indigo-600 text-white flex justify-between items-center">
+        <h3 class="font-bold text-sm flex items-center space-x-1.5">
+          <span>💰 Collect EMI Installment</span>
+        </h3>
+        <button onclick="closeModal('modalCollectEmi')" class="text-white hover:text-indigo-200 font-bold">✕</button>
+      </div>
+
+      <div class="p-5 space-y-4 text-xs">
+        <!-- CUSTOMER & INVOICE SUMMARY -->
+        <div class="p-3 bg-indigo-50 rounded-lg border border-indigo-100 space-y-1.5" id="emiCollectCustomerDetails">
+          <!-- Populated by JS -->
+        </div>
+
+        <!-- PAST INSTALLMENTS HISTORY -->
+        <div class="border border-gray-200 rounded-lg overflow-hidden">
+          <div class="px-3 py-2 bg-gray-50 font-bold text-gray-700 flex justify-between items-center text-[11px]">
+            <span>Payment History</span>
+            <span id="emiCollectHistoryCount" class="text-gray-500">0 payments</span>
+          </div>
+          <div id="emiCollectHistoryList" class="max-h-36 overflow-y-auto divide-y divide-gray-100 p-2 space-y-1 text-[11px]">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+
+        <!-- COLLECTION FORM -->
+        <form id="emiCollectForm" onsubmit="handleSaveEmiPayment(event)" class="space-y-3 pt-1">
+          <input type="hidden" id="emiCollectOrderId">
+
+          <div>
+            <label class="block font-bold text-gray-700 mb-1">Amount to Collect (৳) *</label>
+            <input
+              type="number"
+              id="emiCollectAmount"
+              required
+              step="50"
+              min="1"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-indigo-500 text-base font-extrabold text-emerald-700"
+            >
+          </div>
+
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block font-bold text-gray-700 mb-1">Payment Method</label>
+              <select id="emiCollectMethod" class="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg focus:ring-1 focus:ring-indigo-500">
+                <option value="Cash">Cash</option>
+                <option value="Mobile Banking">bKash / Nagad</option>
+                <option value="Card">Card</option>
+              </select>
+            </div>
+            <div>
+              <label class="block font-bold text-gray-700 mb-1">Note / Description</label>
+              <input type="text" id="emiCollectNote" placeholder="e.g. 2nd Installment" class="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg focus:ring-1 focus:ring-indigo-500">
+            </div>
+          </div>
+
+          <div class="pt-3 border-t flex justify-end space-x-2">
+            <button type="button" onclick="closeModal('modalCollectEmi')" class="px-3 py-1.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 font-medium">Cancel</button>
+            <button type="submit" id="btnSubmitEmiCollection" class="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold shadow-sm flex items-center space-x-1">
+              <span>Confirm &amp; Print Slip</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- =========================================================
+       MODAL 3: THERMAL / PRINTABLE RECEIPT PREVIEW
+  ========================================================= -->
+  <dialog id="modalReceipt" class="rounded-xl shadow-2xl p-0 backdrop:bg-black/60 border border-gray-200 w-full max-w-sm">
+    <div class="bg-white rounded-xl overflow-hidden flex flex-col">
+      
+      <!-- RECEIPT MODAL ACTIONS (HIDDEN IN PRINT) -->
+      <div class="px-4 py-3 bg-gray-100 border-b flex items-center justify-between no-print">
+        <span class="text-xs font-bold text-gray-700">Receipt Preview</span>
+        <div class="flex items-center space-x-2">
+          <button onclick="window.print()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-1.5 px-3 rounded shadow transition flex items-center space-x-1">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+            <span>Print</span>
+          </button>
+          <button onclick="closeModal('modalReceipt')" class="text-gray-500 hover:text-gray-700 text-sm font-bold px-1.5">✕</button>
+        </div>
+      </div>
+
+      <!-- RECEIPT BODY (80mm Thermal Paper Layout) -->
+      <div class="p-6 overflow-y-auto max-h-[580px] font-mono text-gray-900 receipt-print-area" id="receiptPrintArea">
+        <!-- Rendered via JS -->
+      </div>
+
+    </div>
+  </dialog>
+
+  <!-- TOAST NOTIFICATION POPUP -->
+  <div id="toastNotification" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 bg-gray-900 text-white px-4 py-3 rounded-lg shadow-xl text-xs flex items-center space-x-2">
+    <span id="toastIcon">✅</span>
+    <span id="toastMsg">Notification message</span>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
