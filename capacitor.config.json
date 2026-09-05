@@ -1,0 +1,11 @@
+﻿{
+  "appId": "com.biplobshop.pos",
+  "appName": "Biplob Shop POS",
+  "webDir": "public",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": true
+  }
+}

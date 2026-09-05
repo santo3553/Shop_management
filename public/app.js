@@ -777,6 +777,8 @@ async function submitCheckout(printReceipt = false) {
    THERMAL RECEIPT GENERATOR (80mm)
 ========================================================= */
 function renderReceipt(order) {
+  state.currentReceiptOrder = order;
+  state.currentReceiptPayment = null;
   const container = document.getElementById('receiptPrintArea');
   const dateFormatted = new Date(order.created_at).toLocaleString();
 
@@ -948,6 +950,8 @@ function renderReceipt(order) {
 }
 
 function renderEmiPaymentSlip(payment) {
+  state.currentReceiptPayment = payment;
+  state.currentReceiptOrder = null;
   const container = document.getElementById('receiptPrintArea');
   const dateFormatted = new Date(payment.payment_date || Date.now()).toLocaleString();
   const isCleared = payment.remaining_balance <= 0;
@@ -1032,6 +1036,131 @@ function renderEmiPaymentSlip(payment) {
       Biplob Shop POS System
     </div>
   `;
+}
+
+/* =========================================================
+   WHATSAPP DIGITAL RECEIPT SHARING & CAMERA SCANNER ACTIONS
+========================================================= */
+function shareReceiptWhatsApp() {
+  if (state.currentReceiptPayment) {
+    const p = state.currentReceiptPayment;
+    const dateFormatted = new Date(p.payment_date || Date.now()).toLocaleString();
+    const isCleared = p.remaining_balance <= 0;
+    const text = 
+`🧾 *BIPLOB SHOP - INSTALLMENT MONEY RECEIPT*
+━━━━━━━━━━━━━━━━━━━━
+*Receipt No:* REC-${p.payment_id || Date.now().toString().slice(-6)}
+*Invoice Ref:* ${p.invoice_number}
+*Date:* ${dateFormatted}
+*Customer:* ${p.customer_name || 'Valued Customer'}
+*Phone:* ${p.customer_phone || 'N/A'}
+━━━━━━━━━━━━━━━━━━━━
+*Amount Collected:* ৳ ${(p.amount_paid || 0).toLocaleString()}
+*Payment Method:* ${p.payment_method || 'Cash'}
+*Remaining Due:* ৳ ${(p.remaining_balance || 0).toLocaleString()}
+*Status:* ${isCleared ? '✅ FULLY SETTLED' : '⚠️ ACTIVE INSTALLMENT'}
+━━━━━━━━━━━━━━━━━━━━
+Thank you for your payment!
+*Biplob Shop - Mobile & Accessories*`;
+
+    let phone = (p.customer_phone || '').replace(/[^0-9]/g, '');
+    if (phone.length === 11 && phone.startsWith('01')) {
+      phone = '88' + phone;
+    }
+    const waUrl = phone ? `https://wa.me/${phone}?text=${encodeURIComponent(text)}` : `https://wa.me/?text=${encodeURIComponent(text)}`;
+    window.open(waUrl, '_blank');
+    return;
+  }
+
+  if (state.currentReceiptOrder) {
+    const o = state.currentReceiptOrder;
+    const dateFormatted = new Date(o.created_at || Date.now()).toLocaleString();
+    let itemsText = '';
+    (o.items || []).forEach(it => {
+      const isPhone = it.item_type === 'phone';
+      itemsText += `• ${it.title} (x${it.quantity}) - ৳ ${(it.total_price || 0).toLocaleString()}` + (isPhone ? `\n  IMEI: ${it.sku_or_imei}` : '') + `\n`;
+    });
+
+    let emiExtra = '';
+    if (o.is_emi) {
+      if (o.emi_type === 'Bank EMI') {
+        emiExtra = `\n🏦 *Bank EMI Plan:* ${o.emi_bank_name || 'Bank Card'} (${o.emi_tenure_months} Mo @ ৳ ${(o.emi_monthly_amount || 0).toLocaleString()}/mo)`;
+      } else {
+        emiExtra = `\n📋 *Shop Installment Plan:*\n• Down Payment: ৳ ${(o.emi_down_payment || 0).toLocaleString()}\n• Remaining Due: ৳ ${(o.emi_remaining_due || 0).toLocaleString()}\n• Tenure: ${o.emi_tenure_months} Mo @ ৳ ${(o.emi_monthly_amount || 0).toLocaleString()}/mo\n• Status: ${o.emi_status || 'Active'}`;
+      }
+    }
+
+    const text = 
+`🧾 *BIPLOB SHOP - SALES INVOICE*
+━━━━━━━━━━━━━━━━━━━━
+*Invoice #:* ${o.invoice_number}
+*Date:* ${dateFormatted}
+*Customer:* ${o.customer_name || 'Valued Customer'}
+*Phone:* ${o.customer_phone || 'N/A'}
+━━━━━━━━━━━━━━━━━━━━
+*ITEMS PURCHASED:*
+${itemsText.trim()}
+━━━━━━━━━━━━━━━━━━━━
+*Subtotal:* ৳ ${(o.subtotal || 0).toLocaleString()}
+*Discount:* ৳ ${(o.discount || 0).toLocaleString()}
+*Total Bill:* ৳ ${(o.total_amount || 0).toLocaleString()}${emiExtra}
+━━━━━━━━━━━━━━━━━━━━
+Thank you for shopping with Biplob Shop!
+*Official Computer-Generated Receipt*`;
+
+    let phone = (o.customer_phone || '').replace(/[^0-9]/g, '');
+    if (phone.length === 11 && phone.startsWith('01')) {
+      phone = '88' + phone;
+    }
+    const waUrl = phone ? `https://wa.me/${phone}?text=${encodeURIComponent(text)}` : `https://wa.me/?text=${encodeURIComponent(text)}`;
+    window.open(waUrl, '_blank');
+    return;
+  }
+
+  showToast('No active receipt to share', '⚠️');
+}
+
+function startCameraScanForPos() {
+  if (window.CameraScanner) {
+    CameraScanner.open((code) => {
+      const input = document.getElementById('posSearchInput');
+      if (input) {
+        input.value = code;
+        handlePosSearch();
+      }
+    }, 'Scan Barcode / Handset IMEI');
+  } else {
+    showToast('Camera scanner not ready', '⚠️');
+  }
+}
+
+function startCameraScanForAccessorySku() {
+  if (window.CameraScanner) {
+    CameraScanner.open((code) => {
+      const input = document.getElementById('itemSku');
+      if (input) {
+        input.value = code;
+        showToast(`Scanned SKU: ${code}`, '✅');
+      }
+    }, 'Scan Accessory Barcode');
+  } else {
+    showToast('Camera scanner not ready', '⚠️');
+  }
+}
+
+function startCameraScanForPhoneImei() {
+  if (window.CameraScanner) {
+    CameraScanner.open((code) => {
+      const input = document.getElementById('phoneImei');
+      if (input) {
+        input.value = code;
+        checkImeiDuplicate(code);
+        showToast(`Scanned IMEI: ${code}`, '✅');
+      }
+    }, 'Scan Handset IMEI Barcode');
+  } else {
+    showToast('Camera scanner not ready', '⚠️');
+  }
 }
 
 /* =========================================================

@@ -2,7 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#312e81">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Biplob Shop - Mobile POS & Inventory</title>
   <!-- Tailwind CSS via CDN with offline CSS fallback in styles.css -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
@@ -109,13 +113,22 @@
               <input
                 type="text"
                 id="posSearchInput"
-                class="w-full pl-11 pr-24 py-3 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm font-medium"
+                class="w-full pl-11 pr-32 py-3 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm font-medium"
                 placeholder="Scan Barcode / SKU, or type Phone IMEI / Model..."
                 autofocus
                 autocomplete="off"
               >
-              <div class="absolute inset-y-0 right-0 pr-3 flex items-center space-x-1">
-                <span class="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded font-mono">Enter ↵</span>
+              <div class="absolute inset-y-0 right-0 pr-2.5 flex items-center space-x-1.5">
+                <button
+                  type="button"
+                  onclick="startCameraScanForPos()"
+                  class="bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white px-2.5 py-1.5 rounded-md text-xs font-bold flex items-center space-x-1 shadow-sm transition"
+                  title="Scan with Mobile Camera"
+                >
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                  <span>📷 Scan</span>
+                </button>
+                <span class="text-[11px] bg-gray-200 text-gray-600 px-1.5 py-1 rounded font-mono hidden sm:inline">↵</span>
               </div>
             </div>
 
@@ -745,14 +758,24 @@
         <div>
           <div class="flex justify-between items-center mb-1">
             <label class="font-bold text-gray-700">SKU / Barcode *</label>
-            <button
-              type="button"
-              onclick="generateSmartSku()"
-              class="text-indigo-600 hover:text-indigo-800 font-bold flex items-center space-x-1"
-              title="Generate a smart SKU code from the product name"
-            >
-              <span>⚡ Auto-Generate from Name</span>
-            </button>
+            <div class="flex items-center space-x-2">
+              <button
+                type="button"
+                onclick="startCameraScanForAccessorySku()"
+                class="text-indigo-600 hover:text-indigo-800 font-bold flex items-center space-x-0.5 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100"
+                title="Scan box barcode with mobile camera"
+              >
+                <span>📷 Scan</span>
+              </button>
+              <button
+                type="button"
+                onclick="generateSmartSku()"
+                class="text-indigo-600 hover:text-indigo-800 font-bold flex items-center space-x-0.5"
+                title="Generate a smart SKU code from the product name"
+              >
+                <span>⚡ Auto-Generate</span>
+              </button>
+            </div>
           </div>
           <input
             type="text"
@@ -868,7 +891,17 @@
         <input type="hidden" id="phoneId">
 
         <div>
-          <label class="block font-bold text-gray-700 mb-1">IMEI Number (Unique 15-digits) *</label>
+          <div class="flex justify-between items-center mb-1">
+            <label class="font-bold text-gray-700">IMEI Number (Unique 15-digits) *</label>
+            <button
+              type="button"
+              onclick="startCameraScanForPhoneImei()"
+              class="text-indigo-600 hover:text-indigo-800 font-bold flex items-center space-x-1 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100"
+              title="Scan box IMEI barcode with mobile camera"
+            >
+              <span>📷 Scan Barcode</span>
+            </button>
+          </div>
           <input
             type="text"
             id="phoneImei"
@@ -1058,6 +1091,9 @@
       <div class="px-4 py-3 bg-gray-100 border-b flex items-center justify-between no-print">
         <span class="text-xs font-bold text-gray-700">Receipt Preview</span>
         <div class="flex items-center space-x-2">
+          <button onclick="shareReceiptWhatsApp()" class="bg-green-600 hover:bg-green-700 active:bg-green-800 text-white text-xs font-bold py-1.5 px-3 rounded shadow transition flex items-center space-x-1" title="Share receipt with customer on WhatsApp">
+            <span>📲 WhatsApp</span>
+          </button>
           <button onclick="window.print()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-1.5 px-3 rounded shadow transition flex items-center space-x-1">
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
             <span>Print</span>
@@ -1074,12 +1110,79 @@
     </div>
   </dialog>
 
+  <!-- =========================================================
+       MODAL 4: CAMERA BARCODE / IMEI SCANNER
+  ========================================================= -->
+  <dialog id="modalCameraScanner" class="rounded-2xl shadow-2xl p-0 backdrop:bg-black/80 border border-gray-700 w-full max-w-md bg-gray-950 text-white overflow-hidden">
+    <div class="relative flex flex-col h-[520px] max-h-[85vh]">
+      <!-- Top header bar -->
+      <div class="px-4 py-3 bg-gray-900/90 backdrop-blur border-b border-gray-800 flex items-center justify-between z-10">
+        <div class="flex items-center space-x-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+          <h3 id="cameraScannerTitle" class="text-sm font-bold tracking-tight text-white">Scan Barcode / IMEI</h3>
+        </div>
+        <button type="button" onclick="CameraScanner.close()" class="w-8 h-8 flex items-center justify-center rounded-full bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white font-bold transition">✕</button>
+      </div>
+
+      <!-- Live Video Viewfinder & Reticle -->
+      <div class="relative flex-1 bg-black flex items-center justify-center overflow-hidden">
+        <video id="cameraScannerVideo" playsinline autoplay muted class="w-full h-full object-cover"></video>
+
+        <!-- Aiming reticle / targeting box -->
+        <div class="absolute inset-0 pointer-events-none flex flex-col items-center justify-center">
+          <div class="w-64 h-40 sm:w-72 sm:h-44 border-2 border-indigo-500 rounded-xl relative shadow-[0_0_0_9999px_rgba(0,0,0,0.55)]">
+            <!-- Corner highlights -->
+            <div class="absolute -top-1 -left-1 w-5 h-5 border-t-4 border-l-4 border-emerald-400 rounded-tl"></div>
+            <div class="absolute -top-1 -right-1 w-5 h-5 border-t-4 border-r-4 border-emerald-400 rounded-tr"></div>
+            <div class="absolute -bottom-1 -left-1 w-5 h-5 border-b-4 border-l-4 border-emerald-400 rounded-bl"></div>
+            <div class="absolute -bottom-1 -right-1 w-5 h-5 border-b-4 border-r-4 border-emerald-400 rounded-br"></div>
+            <!-- Red laser scanline -->
+            <div class="absolute left-1 right-1 h-0.5 bg-red-500 shadow-[0_0_8px_#ef4444] animate-pulse top-1/2 -translate-y-1/2"></div>
+          </div>
+          <p id="cameraScannerStatus" class="mt-4 text-xs font-medium text-gray-200 bg-black/70 px-3 py-1.5 rounded-full backdrop-blur text-center max-w-[85%]">
+            Align barcode or IMEI inside the frame
+          </p>
+        </div>
+      </div>
+
+      <!-- Bottom controls bar -->
+      <div class="px-4 py-3 bg-gray-900/90 backdrop-blur border-t border-gray-800 flex items-center justify-between z-10">
+        <button
+          type="button"
+          id="btnScannerTorch"
+          onclick="CameraScanner.toggleTorch()"
+          class="hidden px-3 py-1.5 rounded-lg text-xs font-bold bg-gray-800 text-white shadow hover:bg-gray-700 transition"
+        >
+          🔦 Flashlight
+        </button>
+        <button
+          type="button"
+          onclick="CameraScanner.switchCamera()"
+          class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-800 text-gray-200 hover:text-white hover:bg-gray-700 transition flex items-center space-x-1"
+        >
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+          <span>Switch Camera</span>
+        </button>
+        <button
+          type="button"
+          onclick="CameraScanner.close()"
+          class="px-4 py-1.5 rounded-lg text-xs font-bold bg-red-600/80 hover:bg-red-600 text-white shadow transition"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  </dialog>
+
   <!-- TOAST NOTIFICATION POPUP -->
   <div id="toastNotification" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 bg-gray-900 text-white px-4 py-3 rounded-lg shadow-xl text-xs flex items-center space-x-2">
     <span id="toastIcon">✅</span>
     <span id="toastMsg">Notification message</span>
   </div>
 
+  <!-- OFFLINE ON-DEVICE STORAGE & CAMERA SCANNER SCRIPTS -->
+  <script src="mobile-db.js"></script>
+  <script src="scanner.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

@@ -1,4 +1,4 @@
-﻿# Dependencies
+# Dependencies
 node_modules/
 package-lock.json
 
@@ -32,3 +32,12 @@ Thumbs.db
 *.njsproj
 *.sln
 *.sw?
+
+# Android Build & Gradle Cache
+.gradle/
+android/.gradle/
+android/build/
+android/app/build/
+android/capacitor-android/build/
+android/capacitor-cordova-android-plugins/build/
+android/local.properties
