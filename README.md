@@ -1,4 +1,4 @@
-# 📱 Biplob Shop - Mobile Retail & Accessories POS System
+# 📱  Mobile Retail & Accessories POS System
 
 A fast, lightweight, local-first inventory management and Point-of-Sale (POS) web application designed specifically for mobile phone retail and accessories shops. Built with Node.js, Express, SQLite, and responsive Tailwind styling.
 
