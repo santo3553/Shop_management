@@ -907,8 +907,8 @@ function renderReceipt(order) {
 
   container.innerHTML = `
     <div style="text-align: center; margin-bottom: 10px;">
-      <div style="font-size: 18px; font-weight: 900; letter-spacing: 0.5px;">BIPLOB SHOP</div>
-      <div style="font-size: 11px; font-weight: bold; margin-top: 2px;">MOBILE RETAIL & ACCESSORIES</div>
+      <div style="font-size: 18px; font-weight: 900; letter-spacing: 0.5px;">MOBILE DECOR & TECH</div>
+      <div style="font-size: 11px; font-weight: bold; margin-top: 2px;">SMARTPHONES, ACCESSORIES & TECH</div>
       <div style="font-size: 10px; color: #555;">Dhaka, Bangladesh | Support: 01700-000000</div>
     </div>
 
@@ -982,7 +982,7 @@ function renderReceipt(order) {
       <div>Pre-Owned Handsets: 30 Days Hardware Service</div>
       <div>Accessories: 7 Days Replacement Warranty</div>
       <div style="font-size: 8px; color: #666; margin-top: 2px;">* Warranty void if IMEI seal is broken or tampered.</div>
-      <div style="margin-top: 8px; font-weight: bold;">Thank You For Choosing Biplob Shop!</div>
+      <div style="margin-top: 8px; font-weight: bold;">Thank You For Choosing Mobile Decor & Tech!</div>
     </div>
   `;
 }
@@ -996,7 +996,7 @@ function renderEmiPaymentSlip(payment) {
 
   container.innerHTML = `
     <div style="text-align: center; margin-bottom: 10px;">
-      <div style="font-size: 18px; font-weight: 900; letter-spacing: 0.5px;">BIPLOB SHOP</div>
+      <div style="font-size: 18px; font-weight: 900; letter-spacing: 0.5px;">MOBILE DECOR & TECH</div>
       <div style="font-size: 11px; font-weight: bold; margin-top: 2px;">INSTALLMENT MONEY RECEIPT</div>
       <div style="font-size: 10px; color: #555;">Dhaka, Bangladesh | Support: 01700-000000</div>
     </div>
@@ -1071,7 +1071,7 @@ function renderEmiPaymentSlip(payment) {
 
     <div style="text-align: center; font-size: 9px; color: #666; margin-top: 10px;">
       Official Computer Generated Money Receipt<br>
-      Biplob Shop POS System
+      Mobile Decor & Tech POS System
     </div>
   `;
 }
@@ -1085,7 +1085,7 @@ function shareReceiptWhatsApp() {
     const dateFormatted = new Date(p.payment_date || Date.now()).toLocaleString();
     const isCleared = p.remaining_balance <= 0;
     const text = 
-`🧾 *BIPLOB SHOP - INSTALLMENT MONEY RECEIPT*
+`🧾 *MOBILE DECOR & TECH - INSTALLMENT MONEY RECEIPT*
 ━━━━━━━━━━━━━━━━━━━━
 *Receipt No:* REC-${p.payment_id || Date.now().toString().slice(-6)}
 *Invoice Ref:* ${p.invoice_number}
@@ -1099,7 +1099,7 @@ function shareReceiptWhatsApp() {
 *Status:* ${isCleared ? '✅ FULLY SETTLED' : '⚠️ ACTIVE INSTALLMENT'}
 ━━━━━━━━━━━━━━━━━━━━
 Thank you for your payment!
-*Biplob Shop - Mobile & Accessories*`;
+*Mobile Decor & Tech - Smartphones & Accessories*`;
 
     let phone = (p.customer_phone || '').replace(/[^0-9]/g, '');
     if (phone.length === 11 && phone.startsWith('01')) {
@@ -1129,7 +1129,7 @@ Thank you for your payment!
     }
 
     const text = 
-`🧾 *BIPLOB SHOP - SALES INVOICE*
+`🧾 *MOBILE DECOR & TECH - SALES INVOICE*
 ━━━━━━━━━━━━━━━━━━━━
 *Invoice #:* ${o.invoice_number}
 *Date:* ${dateFormatted}
@@ -1143,7 +1143,7 @@ ${itemsText.trim()}
 *Discount:* ৳ ${(o.discount || 0).toLocaleString()}
 *Total Bill:* ৳ ${(o.total_amount || 0).toLocaleString()}${emiExtra}
 ━━━━━━━━━━━━━━━━━━━━
-Thank you for shopping with Biplob Shop!
+Thank you for shopping with Mobile Decor & Tech!
 *Official Computer-Generated Receipt*`;
 
     let phone = (o.customer_phone || '').replace(/[^0-9]/g, '');

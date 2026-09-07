@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Biplob Shop POS</string>
-    <string name="title_activity_main">Biplob Shop POS</string>
+    <string name="app_name">Mobile Decor &amp; Tech</string>
+    <string name="title_activity_main">Mobile Decor &amp; Tech</string>
     <string name="package_name">com.biplobshop.pos</string>
     <string name="custom_url_scheme">com.biplobshop.pos</string>
 </resources>

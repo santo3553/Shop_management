@@ -1,6 +1,6 @@
-﻿{
+{
   "appId": "com.biplobshop.pos",
-  "appName": "Biplob Shop POS",
+  "appName": "Mobile Decor & Tech",
   "webDir": "public",
   "server": {
     "androidScheme": "https"
