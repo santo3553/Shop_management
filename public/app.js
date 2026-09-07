@@ -135,9 +135,12 @@ function switchTab(tabName) {
   } else if (tabName === 'inventory') {
     if (state.inventorySubTab === 'accessories') {
       loadAccessoriesTable();
-    } else {
+    } else if (state.inventorySubTab === 'phones') {
       loadPhonesTable();
+    } else if (state.inventorySubTab === 'outofstock') {
+      loadOutOfStockTable();
     }
+    updateOutOfStockBadge();
   } else if (tabName === 'orders') {
     loadOrdersTable();
   } else if (tabName === 'reports') {
@@ -149,25 +152,41 @@ function switchInventorySubTab(subTab) {
   state.inventorySubTab = subTab;
   const btnAcc = document.getElementById('subTabBtn-accessories');
   const btnPhone = document.getElementById('subTabBtn-phones');
+  const btnOutOfStock = document.getElementById('subTabBtn-outofstock');
   const viewAcc = document.getElementById('subView-accessories');
   const viewPhone = document.getElementById('subView-phones');
+  const viewOutOfStock = document.getElementById('subView-outofstock');
   const btnAddText = document.getElementById('btnAddItemText');
 
+  btnAcc.className = 'px-3.5 py-2 text-xs md:text-sm font-bold rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 flex items-center space-x-2 transition';
+  btnPhone.className = 'px-3.5 py-2 text-xs md:text-sm font-bold rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 flex items-center space-x-2 transition';
+  if (btnOutOfStock) {
+    btnOutOfStock.className = 'px-3.5 py-2 text-xs md:text-sm font-bold rounded-lg bg-gray-100 text-red-700 hover:bg-red-50 flex items-center space-x-2 border border-transparent hover:border-red-200 transition';
+  }
+
+  viewAcc.classList.add('hidden');
+  viewPhone.classList.add('hidden');
+  if (viewOutOfStock) viewOutOfStock.classList.add('hidden');
+
   if (subTab === 'accessories') {
-    btnAcc.className = 'px-4 py-2 text-sm font-bold rounded-lg bg-indigo-600 text-white shadow-sm flex items-center space-x-2';
-    btnPhone.className = 'px-4 py-2 text-sm font-bold rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 flex items-center space-x-2';
+    btnAcc.className = 'px-3.5 py-2 text-xs md:text-sm font-bold rounded-lg bg-indigo-600 text-white shadow-sm flex items-center space-x-2 transition';
     viewAcc.classList.remove('hidden');
-    viewPhone.classList.add('hidden');
     btnAddText.textContent = 'Add Accessory';
     loadAccessoriesTable();
-  } else {
-    btnPhone.className = 'px-4 py-2 text-sm font-bold rounded-lg bg-indigo-600 text-white shadow-sm flex items-center space-x-2';
-    btnAcc.className = 'px-4 py-2 text-sm font-bold rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 flex items-center space-x-2';
+  } else if (subTab === 'phones') {
+    btnPhone.className = 'px-3.5 py-2 text-xs md:text-sm font-bold rounded-lg bg-indigo-600 text-white shadow-sm flex items-center space-x-2 transition';
     viewPhone.classList.remove('hidden');
-    viewAcc.classList.add('hidden');
     btnAddText.textContent = 'Add Handset (IMEI)';
     loadPhonesTable();
+  } else if (subTab === 'outofstock') {
+    if (btnOutOfStock) {
+      btnOutOfStock.className = 'px-3.5 py-2 text-xs md:text-sm font-bold rounded-lg bg-red-600 text-white shadow-sm flex items-center space-x-2 border border-red-700 transition';
+    }
+    if (viewOutOfStock) viewOutOfStock.classList.remove('hidden');
+    btnAddText.textContent = 'Add Product';
+    loadOutOfStockTable();
   }
+  updateOutOfStockBadge();
 }
 
 /* =========================================================
@@ -808,6 +827,7 @@ async function submitCheckout(printReceipt = false) {
     selectPaymentMethod('Cash');
     renderCart();
     loadPosCatalog();
+    updateOutOfStockBadge();
 
     // Render receipt
     renderReceipt(data);
@@ -1293,8 +1313,10 @@ function debouncedSearchInventory() {
   inventorySearchTimer = setTimeout(() => {
     if (state.inventorySubTab === 'accessories') {
       loadAccessoriesTable();
-    } else {
+    } else if (state.inventorySubTab === 'phones') {
       loadPhonesTable();
+    } else if (state.inventorySubTab === 'outofstock') {
+      loadOutOfStockTable();
     }
   }, 250);
 }
@@ -1314,6 +1336,7 @@ async function loadAccessoriesTable() {
     const items = await res.json();
 
     document.getElementById('invAccCountBadge').textContent = items.length;
+    updateOutOfStockBadge();
     const tbody = document.getElementById('accessoriesTableBody');
 
     if (items.length === 0) {
@@ -1322,9 +1345,10 @@ async function loadAccessoriesTable() {
     }
 
     tbody.innerHTML = items.map(item => {
-      const isLow = item.stock_quantity <= item.min_alert_threshold;
+      const isZero = Number(item.stock_quantity) <= 0;
+      const isLow = Number(item.stock_quantity) <= Number(item.min_alert_threshold);
       return `
-        <tr class="hover:bg-gray-50 ${isLow ? 'bg-red-50/40' : ''}">
+        <tr class="hover:bg-gray-50 ${isZero ? 'bg-red-50/50' : isLow ? 'bg-amber-50/40' : ''}">
           <td class="px-4 py-3 font-mono font-semibold text-gray-800">${item.sku_or_barcode}</td>
           <td class="px-4 py-3">
             <div class="flex items-center space-x-2.5">
@@ -1345,14 +1369,18 @@ async function loadAccessoriesTable() {
           <td class="px-4 py-3 text-center">
             <div class="inline-flex items-center space-x-1.5">
               <button onclick="quickAdjustStock(${item.id}, -1)" class="w-5 h-5 rounded bg-gray-200 text-gray-700 hover:bg-red-200 font-bold text-xs flex items-center justify-center">-</button>
-              <span class="font-extrabold px-1.5 ${isLow ? 'text-red-600' : 'text-gray-900'}">${item.stock_quantity}</span>
+              <span class="font-extrabold px-1.5 ${isZero ? 'text-red-600' : isLow ? 'text-amber-600' : 'text-gray-900'}">${item.stock_quantity}</span>
               <button onclick="quickAdjustStock(${item.id}, 1)" class="w-5 h-5 rounded bg-gray-200 text-gray-700 hover:bg-emerald-200 font-bold text-xs flex items-center justify-center">+</button>
             </div>
           </td>
           <td class="px-4 py-3 text-center text-gray-500">${item.min_alert_threshold}</td>
           <td class="px-4 py-3 text-center">
-            ${isLow ? `
-              <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-extrabold bg-red-100 text-red-700">
+            ${isZero ? `
+              <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-extrabold bg-red-100 text-red-700 border border-red-200">
+                ⚠️ Out of Stock (0)
+              </span>
+            ` : isLow ? `
+              <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-extrabold bg-amber-100 text-amber-800 border border-amber-200">
                 ⚠️ Low (${item.stock_quantity})
               </span>
             ` : `
@@ -1616,6 +1644,7 @@ async function loadPhonesTable() {
     const phones = await res.json();
 
     document.getElementById('invPhoneCountBadge').textContent = phones.filter(p => p.status === 'In-Stock').length;
+    updateOutOfStockBadge();
     const tbody = document.getElementById('phonesTableBody');
 
     if (phones.length === 0) {
@@ -1823,6 +1852,247 @@ async function deletePhone(id) {
     loadPhonesTable();
   } catch (err) {
     showToast(err.message, '❌');
+  }
+}
+
+/* =========================================================
+   INVENTORY: OUT OF STOCK MANAGEMENT & CSV REORDER
+========================================================= */
+async function updateOutOfStockBadge() {
+  try {
+    const res = await fetch('/api/items/out-of-stock?type=all');
+    const items = await res.json();
+    const count = Array.isArray(items) ? items.length : 0;
+    const badge = document.getElementById('invOutOfStockCountBadge');
+    if (badge) {
+      badge.textContent = count;
+      if (count > 0) {
+        badge.className = 'bg-red-600 text-white text-xs px-2 py-0.5 rounded-full font-bold';
+      } else {
+        badge.className = 'bg-gray-300 text-gray-700 text-xs px-2 py-0.5 rounded-full font-bold';
+      }
+    }
+  } catch (_) {}
+}
+
+async function loadOutOfStockTable() {
+  const search = document.getElementById('invSearchInput')?.value.trim() || '';
+  const typeFilter = document.getElementById('outOfStockTypeFilter')?.value || 'all';
+
+  let queryUrl = `/api/items/out-of-stock?type=${encodeURIComponent(typeFilter)}&`;
+  if (search) queryUrl += `search=${encodeURIComponent(search)}&`;
+
+  const tbody = document.getElementById('outOfStockTableBody');
+  const totalPill = document.getElementById('outOfStockTotalPill');
+
+  try {
+    const res = await fetch(queryUrl);
+    const items = await res.json();
+
+    if (totalPill) {
+      totalPill.textContent = `${items.length} Product${items.length === 1 ? '' : 's'}`;
+    }
+
+    const badge = document.getElementById('invOutOfStockCountBadge');
+    if (badge && typeFilter === 'all' && !search) {
+      badge.textContent = items.length;
+      if (items.length > 0) {
+        badge.className = 'bg-red-600 text-white text-xs px-2 py-0.5 rounded-full font-bold';
+      } else {
+        badge.className = 'bg-gray-300 text-gray-700 text-xs px-2 py-0.5 rounded-full font-bold';
+      }
+    }
+
+    if (!items || items.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="9" class="text-center py-12">
+            <div class="flex flex-col items-center justify-center space-y-2 text-gray-400">
+              <span class="text-3xl">🎉</span>
+              <p class="text-sm font-semibold text-gray-600">Great job! No out-of-stock products in this view.</p>
+              <p class="text-xs text-gray-400">All inventory items are well-stocked.</p>
+            </div>
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    tbody.innerHTML = items.map(item => {
+      const isPhone = item.item_type === 'phone' || !!item.imei_number;
+      const thumb = item.image
+        ? `<img src="${item.image}" alt="" class="w-8 h-8 rounded-lg object-cover border border-gray-200 flex-shrink-0 shadow-xs">`
+        : `<div class="w-8 h-8 rounded-lg bg-gray-100 border border-gray-200 flex items-center justify-center text-xs flex-shrink-0 text-gray-400">${isPhone ? '📱' : '📦'}</div>`;
+
+      const title = isPhone
+        ? `${item.brand} ${item.model} ${item.storage_capacity || ''}`
+        : item.title;
+
+      const subDetail = isPhone
+        ? `<p class="text-[10px] text-gray-500">${item.condition_grade || 'Handset'} ${item.warranty_type ? '• ' + item.warranty_type : ''}</p>`
+        : `<p class="text-[10px] text-gray-400 font-mono">Alert Limit: ${item.min_alert_threshold || 5} pcs</p>`;
+
+      const code = isPhone ? item.imei_number : item.sku_or_barcode;
+      const typeLabel = isPhone
+        ? `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-800">📱 Handset</span>`
+        : `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800">📦 Accessory</span>`;
+
+      const category = isPhone ? (item.brand || 'Phone') : (item.category_name || 'General');
+      const location = isPhone ? '-' : (item.rack_location ? `📍 ${item.rack_location}` : '-');
+      const cost = isPhone ? item.purchase_cost : item.cost_price;
+      const price = item.selling_price;
+
+      const stockBadge = isPhone
+        ? `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black bg-gray-200 text-gray-800">Sold (0)</span>`
+        : `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black bg-red-100 text-red-700 border border-red-200">0 Stock</span>`;
+
+      const safeName = (isPhone ? `${item.brand} ${item.model}` : item.title).replace(/'/g, "\\'");
+      const restockAction = isPhone
+        ? `<button onclick="quickRestockPhone(${item.id}, '${safeName}')" class="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-xs shadow-xs transition active:scale-95" title="Mark back in stock">+ In-Stock</button>
+           <button onclick="openEditPhoneModal(${item.id})" class="text-gray-500 hover:text-indigo-600 font-semibold text-xs ml-1.5">Edit</button>`
+        : `<button onclick="quickRestockItem(${item.id}, 'accessory', '${safeName}')" class="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-xs shadow-xs transition active:scale-95" title="Quick add inventory quantity">+ Restock</button>
+           <button onclick="openEditItemModal(${item.id})" class="text-gray-500 hover:text-indigo-600 font-semibold text-xs ml-1.5">Edit</button>`;
+
+      return `
+        <tr class="hover:bg-red-50/20 bg-red-50/10">
+          <td class="px-4 py-3">
+            <div class="flex items-center space-x-2.5">
+              ${thumb}
+              <div>
+                <span class="font-bold text-gray-900">${title}</span>
+                ${subDetail}
+              </div>
+            </div>
+          </td>
+          <td class="px-4 py-3">${typeLabel}</td>
+          <td class="px-4 py-3 font-mono font-bold text-gray-800">${code}</td>
+          <td class="px-4 py-3 text-gray-600">${category}</td>
+          <td class="px-4 py-3 text-gray-600 font-mono text-[11px]">${location}</td>
+          <td class="px-4 py-3 text-right text-gray-600">${formatMoney(cost)}</td>
+          <td class="px-4 py-3 text-right font-bold text-gray-900">${formatMoney(price)}</td>
+          <td class="px-4 py-3 text-center">${stockBadge}</td>
+          <td class="px-4 py-3 text-right whitespace-nowrap">
+            ${restockAction}
+          </td>
+        </tr>
+      `;
+    }).join('');
+  } catch (err) {
+    console.error('Failed to load out of stock items:', err);
+    tbody.innerHTML = `<tr><td colspan="9" class="text-center py-6 text-red-500">Failed to load out-of-stock items: ${err.message}</td></tr>`;
+  }
+}
+
+async function quickRestockItem(id, type, name) {
+  const input = prompt(`Restock "${name}"\nEnter quantity to add to inventory:`, "10");
+  if (input === null) return;
+  const qty = parseInt(input.trim(), 10);
+  if (isNaN(qty) || qty <= 0) {
+    showToast('Please enter a valid positive quantity', '⚠️');
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/items/${id}/adjust-stock`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ delta: qty })
+    });
+    if (res.ok) {
+      showToast(`Added +${qty} pcs to "${name}"! Back in active inventory.`, '✅');
+      loadOutOfStockTable();
+      loadAccessoriesTable();
+      loadPosCatalog();
+      updateOutOfStockBadge();
+    } else {
+      showToast('Failed to adjust stock', '❌');
+    }
+  } catch (err) {
+    showToast('Error adjusting stock: ' + err.message, '❌');
+  }
+}
+
+async function quickRestockPhone(id, name) {
+  const confirmRestore = confirm(`Mark handset "${name}" back as "In-Stock"?\n(If this is a new IMEI handset unit, use "Add Handset" instead).`);
+  if (!confirmRestore) return;
+  try {
+    const res = await fetch(`/api/phones/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'In-Stock' })
+    });
+    if (res.ok) {
+      showToast(`Handset "${name}" marked In-Stock!`, '✅');
+      loadOutOfStockTable();
+      loadPhonesTable();
+      loadPosCatalog();
+      updateOutOfStockBadge();
+    } else {
+      showToast('Failed to update handset status', '❌');
+    }
+  } catch (err) {
+    showToast('Error: ' + err.message, '❌');
+  }
+}
+
+async function exportOutOfStockCsv() {
+  try {
+    showToast('Generating Out-of-Stock CSV...', '⏳');
+    const res = await fetch('/api/items/out-of-stock?type=all');
+    const items = await res.json();
+
+    if (!items || items.length === 0) {
+      showToast('No out-of-stock products found to export!', 'ℹ️');
+      return;
+    }
+
+    let csv = '\uFEFFItem Type,SKU or IMEI,Product Name / Model,Category or Brand,Tak / Location,Cost Price (BDT),Selling Price (BDT),Current Stock,Min Alert Limit,Suggested Reorder Qty\r\n';
+
+    for (const item of items) {
+      const isPhone = item.item_type === 'phone' || !!item.imei_number;
+      const type = isPhone ? 'Mobile Handset' : 'Accessory';
+      const code = isPhone ? item.imei_number : (item.sku_or_barcode || '');
+      const name = isPhone ? `${item.brand} ${item.model} ${item.storage_capacity || ''} (${item.condition_grade || 'Pre-Owned'})` : (item.title || '');
+      const category = isPhone ? item.brand : (item.category_name || 'General');
+      const location = isPhone ? '-' : (item.rack_location || '-');
+      const cost = Number(isPhone ? item.purchase_cost : item.cost_price || 0).toFixed(2);
+      const price = Number(item.selling_price || 0).toFixed(2);
+      const stock = isPhone ? '0 (Sold)' : (item.stock_quantity || 0);
+      const alertLimit = isPhone ? '1' : (item.min_alert_threshold || 5);
+      const reorderQty = isPhone ? '1' : Math.max(10, (item.min_alert_threshold || 5) * 2);
+
+      const row = [
+        `"${type}"`,
+        `"${code}"`,
+        `"${name.replace(/"/g, '""')}"`,
+        `"${category.replace(/"/g, '""')}"`,
+        `"${location.replace(/"/g, '""')}"`,
+        cost,
+        price,
+        `"${stock}"`,
+        alertLimit,
+        reorderQty
+      ].join(',');
+      csv += row + '\r\n';
+    }
+
+    // Trigger download via Blob (offline-compatible on desktop & mobile)
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const filename = `outofstock-products-${new Date().toISOString().slice(0, 10)}.csv`;
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+    showToast(`✅ Exported ${items.length} out-of-stock items to CSV!`, '📥');
+  } catch (err) {
+    console.error('Export CSV failed:', err);
+    showToast('Failed to export CSV: ' + err.message, '❌');
   }
 }
 
@@ -2221,6 +2491,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   // Preload inventory counts and tables
   loadAccessoriesTable();
   loadPhonesTable();
+  updateOutOfStockBadge();
 
   // Show local IP from current location
   const host = window.location.hostname;

@@ -386,15 +386,19 @@
       <!-- SUB-NAV & ACTIONS HEADER -->
       <div class="bg-white rounded-xl shadow-sm p-4 border border-gray-200 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         
-        <!-- SUB-TABS: ACCESSORIES vs USED PHONES -->
-        <div class="flex space-x-2 border-b md:border-b-0 pb-2 md:pb-0">
-          <button onclick="switchInventorySubTab('accessories')" id="subTabBtn-accessories" class="px-4 py-2 text-sm font-bold rounded-lg bg-indigo-600 text-white shadow-sm flex items-center space-x-2">
+        <!-- SUB-TABS: ACCESSORIES vs USED PHONES vs OUT OF STOCK -->
+        <div class="flex flex-wrap items-center gap-2 border-b md:border-b-0 pb-2 md:pb-0">
+          <button onclick="switchInventorySubTab('accessories')" id="subTabBtn-accessories" class="px-3.5 py-2 text-xs md:text-sm font-bold rounded-lg bg-indigo-600 text-white shadow-sm flex items-center space-x-2 transition">
             <span>📦 Accessories &amp; General</span>
             <span id="invAccCountBadge" class="bg-indigo-800 text-indigo-100 text-xs px-2 py-0.5 rounded-full">0</span>
           </button>
-          <button onclick="switchInventorySubTab('phones')" id="subTabBtn-phones" class="px-4 py-2 text-sm font-bold rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 flex items-center space-x-2">
+          <button onclick="switchInventorySubTab('phones')" id="subTabBtn-phones" class="px-3.5 py-2 text-xs md:text-sm font-bold rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 flex items-center space-x-2 transition">
             <span>📱 Mobile Handsets (IMEI)</span>
             <span id="invPhoneCountBadge" class="bg-gray-200 text-gray-800 text-xs px-2 py-0.5 rounded-full">0</span>
+          </button>
+          <button onclick="switchInventorySubTab('outofstock')" id="subTabBtn-outofstock" class="px-3.5 py-2 text-xs md:text-sm font-bold rounded-lg bg-gray-100 text-red-700 hover:bg-red-50 flex items-center space-x-2 border border-transparent hover:border-red-200 transition">
+            <span>⚠️ Out of Stock</span>
+            <span id="invOutOfStockCountBadge" class="bg-red-600 text-white text-xs px-2 py-0.5 rounded-full font-bold">0</span>
           </button>
         </div>
 
@@ -530,7 +534,73 @@
         </div>
       </div>
 
-    </section>
+      <!-- INVENTORY VIEW 3: OUT OF STOCK PRODUCTS -->
+      <div id="subView-outofstock" class="hidden space-y-4">
+        
+        <!-- SUMMARY BANNER & 1-CLICK CSV EXPORT -->
+        <div class="bg-white rounded-xl shadow-sm border border-red-200 p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-gradient-to-r from-red-50/70 via-white to-amber-50/40">
+          <div class="flex items-start space-x-3.5">
+            <div class="w-11 h-11 rounded-xl bg-red-100 border border-red-200 flex items-center justify-center text-red-600 text-xl font-bold flex-shrink-0 shadow-xs">
+              ⚠️
+            </div>
+            <div>
+              <div class="flex items-center space-x-2.5">
+                <h3 class="text-base font-extrabold text-gray-900">Out of Stock Products</h3>
+                <span id="outOfStockTotalPill" class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-red-100 text-red-800 border border-red-200">0 Products</span>
+              </div>
+              <p class="text-xs text-gray-600 mt-0.5">
+                These items ran out of stock but are <span class="font-bold text-gray-900">safely preserved</span>. One click exports a supplier-ready CSV re-order sheet.
+              </p>
+            </div>
+          </div>
+
+          <div class="flex items-center space-x-2 flex-shrink-0">
+            <button onclick="exportOutOfStockCsv()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2.5 px-4 rounded-xl flex items-center space-x-2 shadow-sm transition active:scale-95">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+              <span>📥 Export Out of Stock CSV (1-Click)</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- OUT OF STOCK TABLE CONTAINER -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <div class="p-3 bg-gray-50 border-b border-gray-200 flex flex-wrap items-center justify-between gap-2 text-xs">
+            <div class="flex items-center space-x-2">
+              <span class="font-bold text-gray-700">Filter By Type:</span>
+              <select id="outOfStockTypeFilter" onchange="loadOutOfStockTable()" class="px-2.5 py-1.5 bg-white border border-gray-300 rounded-lg text-xs font-semibold focus:ring-1 focus:ring-indigo-500">
+                <option value="all">All Out of Stock Items</option>
+                <option value="accessories">Accessories Only (0 Stock)</option>
+                <option value="phones">Handsets Only (Sold IMEI)</option>
+              </select>
+            </div>
+            <div class="text-xs text-gray-500">
+              💡 Tip: Click <span class="font-bold text-indigo-600">+ Restock</span> to instantly add quantity and move back to active inventory.
+            </div>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200 text-left text-xs">
+              <thead class="bg-gray-100 text-gray-700 font-semibold uppercase tracking-wider">
+                <tr>
+                  <th class="px-4 py-3">Photo &amp; Product</th>
+                  <th class="px-4 py-3">Type</th>
+                  <th class="px-4 py-3">SKU / IMEI</th>
+                  <th class="px-4 py-3">Category / Brand</th>
+                  <th class="px-4 py-3">Tak / Location</th>
+                  <th class="px-4 py-3 text-right">Cost Price</th>
+                  <th class="px-4 py-3 text-right">Selling Price</th>
+                  <th class="px-4 py-3 text-center">Current Stock</th>
+                  <th class="px-4 py-3 text-right">Quick Restock &amp; Actions</th>
+                </tr>
+              </thead>
+              <tbody id="outOfStockTableBody" class="divide-y divide-gray-200">
+                <tr><td colspan="9" class="text-center py-8 text-gray-400">Loading out-of-stock items...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
 
     <!-- =========================================================
          TAB 3: INVOICES & ORDERS HISTORY

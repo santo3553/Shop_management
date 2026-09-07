@@ -241,6 +241,53 @@ app.delete('/api/items/:id', (req, res) => {
   }
 });
 
+// GET out-of-stock accessories (stock <= 0) and sold handsets
+app.get('/api/items/out-of-stock', (req, res) => {
+  try {
+    const { type = 'all', search = '' } = req.query;
+    let results = [];
+
+    if (type !== 'phones') {
+      let accSql = `
+        SELECT items.*, categories.name as category_name, 'accessory' as item_type
+        FROM items
+        LEFT JOIN categories ON items.category_id = categories.id
+        WHERE items.stock_quantity <= 0
+      `;
+      const accParams = [];
+      if (search) {
+        accSql += ` AND (items.title LIKE ? OR items.sku_or_barcode LIKE ?)`;
+        const q = `%${search}%`;
+        accParams.push(q, q);
+      }
+      accSql += ` ORDER BY items.updated_at DESC, items.title ASC`;
+      const accItems = db.prepare(accSql).all(...accParams);
+      results = results.concat(accItems);
+    }
+
+    if (type !== 'accessories') {
+      let phoneSql = `
+        SELECT phones.*, 'phone' as item_type
+        FROM phones
+        WHERE status = 'Sold'
+      `;
+      const phoneParams = [];
+      if (search) {
+        phoneSql += ` AND (brand LIKE ? OR model LIKE ? OR imei_number LIKE ?)`;
+        const q = `%${search}%`;
+        phoneParams.push(q, q, q);
+      }
+      phoneSql += ` ORDER BY updated_at DESC`;
+      const phoneItems = db.prepare(phoneSql).all(...phoneParams);
+      results = results.concat(phoneItems);
+    }
+
+    res.json(results);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 /* =========================================================
    USED PHONES & IMEI TRACKING ROUTES
 ========================================================= */
@@ -796,6 +843,68 @@ app.get('/api/reports/export/inventory.csv', (req, res) => {
         p.selling_price.toFixed(2),
         `"${p.status}"`,
         'N/A'
+      ].join(',');
+      csv += row + '\r\n';
+    }
+
+    res.send(csv);
+  } catch (err) {
+    res.status(500).send(`Error exporting CSV: ${err.message}`);
+  }
+});
+
+app.get('/api/reports/export/outofstock.csv', (req, res) => {
+  try {
+    const items = db.prepare(`
+      SELECT items.*, categories.name as category_name
+      FROM items
+      LEFT JOIN categories ON items.category_id = categories.id
+      WHERE items.stock_quantity <= 0
+      ORDER BY categories.name ASC, items.title ASC
+    `).all();
+
+    const phones = db.prepare(`
+      SELECT * FROM phones WHERE status = 'Sold' ORDER BY brand ASC, model ASC
+    `).all();
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="outofstock-products-${Date.now()}.csv"`);
+
+    let csv = '\uFEFFItem Type,SKU or IMEI,Product Name / Model,Category or Brand,Tak / Location,Cost Price (BDT),Selling Price (BDT),Current Stock,Min Alert Limit,Suggested Reorder Qty\r\n';
+
+    for (const i of items) {
+      const reorderQty = Math.max(10, (i.min_alert_threshold || 5) * 2);
+      const row = [
+        '"Accessory"',
+        `"${i.sku_or_barcode}"`,
+        `"${i.title.replace(/"/g, '""')}"`,
+        `"${(i.category_name || 'General').replace(/"/g, '""')}"`,
+        `"${(i.rack_location || '-').replace(/"/g, '""')}"`,
+        i.cost_price.toFixed(2),
+        i.selling_price.toFixed(2),
+        i.stock_quantity,
+        i.min_alert_threshold,
+        reorderQty
+      ].join(',');
+      csv += row + '\r\n';
+    }
+
+    for (const p of phones) {
+      const isBrandNew = p.condition_grade && p.condition_grade.includes('Brand New');
+      const phoneType = isBrandNew ? 'Brand New Handset' : 'Pre-Owned Handset';
+      const detailStr = isBrandNew ? (p.warranty_type || 'Official 1-Year') : `Battery ${p.battery_health}%`;
+      const phoneTitle = `${p.brand} ${p.model} ${p.storage_capacity} (${p.condition_grade}, ${detailStr})`;
+      const row = [
+        `"${phoneType}"`,
+        `"${p.imei_number}"`,
+        `"${phoneTitle.replace(/"/g, '""')}"`,
+        `"${p.brand}"`,
+        '"-"',
+        p.purchase_cost.toFixed(2),
+        p.selling_price.toFixed(2),
+        '"0 (Sold)"',
+        '1',
+        '1'
       ].join(',');
       csv += row + '\r\n';
     }

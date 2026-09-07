@@ -153,6 +153,36 @@ const MobileDB = {
     return item;
   },
 
+  // --- OUT OF STOCK ITEMS ---
+  getOutOfStockItems(type = 'all', search = '') {
+    const q = (search || '').toLowerCase();
+    let results = [];
+
+    if (type !== 'phones') {
+      const items = this.getItems('', '', false);
+      const outOfStockAcc = items.filter(i => (Number(i.stock_quantity) <= 0));
+      const filteredAcc = outOfStockAcc.filter(i => {
+        if (!q) return true;
+        return (i.title && i.title.toLowerCase().includes(q)) ||
+               (i.sku_or_barcode && i.sku_or_barcode.toLowerCase().includes(q));
+      }).map(i => ({ ...i, item_type: 'accessory' }));
+      results = results.concat(filteredAcc);
+    }
+
+    if (type !== 'accessories') {
+      const phones = this.getPhones('Sold', '');
+      const filteredPhones = phones.filter(p => {
+        if (!q) return true;
+        return (p.brand && p.brand.toLowerCase().includes(q)) ||
+               (p.model && p.model.toLowerCase().includes(q)) ||
+               (p.imei_number && p.imei_number.toLowerCase().includes(q));
+      }).map(p => ({ ...p, item_type: 'phone' }));
+      results = results.concat(filteredPhones);
+    }
+
+    return results;
+  },
+
   // --- PHONES (SERIALIZED IMEI) ---
   getPhones(status = '', search = '') {
     let phones = this._get(this.KEYS.PHONES);
@@ -577,6 +607,12 @@ const MobileDB = {
         }
       }
 
+      if (pathname === '/api/items/out-of-stock') {
+        const type = query.get('type') || 'all';
+        const search = query.get('search') || '';
+        return this._json(this.getOutOfStockItems(type, search));
+      }
+
       // 3. Phones
       if (pathname === '/api/phones') {
         if (method === 'GET') {
@@ -651,6 +687,32 @@ const MobileDB = {
         const month = query.get('month');
         const year = query.get('year');
         return this._json(this.getReportsSummary(month, year));
+      }
+
+      if (pathname === '/api/reports/export/outofstock.csv') {
+        const items = this.getOutOfStockItems('all', '');
+        let csv = '\uFEFFItem Type,SKU or IMEI,Product Name / Model,Category or Brand,Tak / Location,Cost Price (BDT),Selling Price (BDT),Current Stock,Min Alert Limit,Suggested Reorder Qty\r\n';
+        for (const i of items) {
+          const isPhone = i.item_type === 'phone' || !!i.imei_number;
+          const type = isPhone ? 'Mobile Handset' : 'Accessory';
+          const code = isPhone ? i.imei_number : (i.sku_or_barcode || '');
+          const name = isPhone ? `${i.brand} ${i.model} ${i.storage_capacity || ''} (${i.condition_grade || 'Pre-Owned'})` : (i.title || '');
+          const cat = isPhone ? i.brand : (i.category_name || 'General');
+          const loc = isPhone ? '-' : (i.rack_location || '-');
+          const cost = Number(isPhone ? i.purchase_cost : i.cost_price || 0).toFixed(2);
+          const price = Number(i.selling_price || 0).toFixed(2);
+          const stock = isPhone ? '0 (Sold)' : (i.stock_quantity || 0);
+          const alert = isPhone ? '1' : (i.min_alert_threshold || 5);
+          const reorder = isPhone ? '1' : Math.max(10, (i.min_alert_threshold || 5) * 2);
+          csv += `"${type}","${code}","${name.replace(/"/g, '""')}","${cat.replace(/"/g, '""')}","${loc.replace(/"/g, '""')}",${cost},${price},"${stock}",${alert},${reorder}\r\n`;
+        }
+        return new Response(csv, {
+          status: 200,
+          headers: {
+            'Content-Type': 'text/csv; charset=utf-8',
+            'Content-Disposition': `attachment; filename="outofstock-products-${Date.now()}.csv"`
+          }
+        });
       }
 
       // 8. System info
