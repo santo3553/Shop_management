@@ -225,7 +225,8 @@ const MobileDB = {
       type: 'accessory',
       selling_price: parseFloat(a.selling_price) || 0,
       stock_quantity: parseInt(a.stock_quantity, 10) || 0,
-      cost_price: parseFloat(a.cost_price) || 0
+      cost_price: parseFloat(a.cost_price) || 0,
+      image: a.image || ''
     }));
 
     const mappedPhones = phones.map(p => ({
@@ -239,7 +240,8 @@ const MobileDB = {
       cost_price: parseFloat(p.purchase_cost) || 0,
       condition_grade: p.condition_grade,
       battery_health: p.battery_health,
-      warranty_type: p.warranty_type
+      warranty_type: p.warranty_type,
+      image: p.image || ''
     }));
 
     if (!q) {

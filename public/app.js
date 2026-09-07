@@ -302,7 +302,7 @@ function renderPosCatalog() {
         class="bg-white border rounded-lg p-3 cursor-pointer hover:border-indigo-500 hover:shadow transition relative flex flex-col justify-between ${isOutOfStock ? 'opacity-50 pointer-events-none bg-gray-50' : 'border-gray-200'}"
       >
         <div>
-          <div class="flex items-start justify-between gap-1 mb-1">
+          <div class="flex items-start justify-between gap-1 mb-1.5">
             <span class="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-gray-100 text-gray-700">
               ${item.code}
             </span>
@@ -310,7 +310,16 @@ function renderPosCatalog() {
               ${badge}
             </div>
           </div>
-          <h4 class="font-bold text-gray-800 text-xs line-clamp-2">${item.title}</h4>
+          <div class="flex items-center space-x-2.5">
+            ${item.image ? `
+              <img src="${item.image}" alt="" class="w-11 h-11 rounded-lg object-cover border border-gray-200 flex-shrink-0 shadow-xs">
+            ` : `
+              <div class="w-11 h-11 rounded-lg bg-gray-100 border border-gray-200 flex items-center justify-center text-base flex-shrink-0 text-gray-400">
+                ${isPhone ? '📱' : '📦'}
+              </div>
+            `}
+            <h4 class="font-bold text-gray-800 text-xs line-clamp-2 leading-snug">${item.title}</h4>
+          </div>
         </div>
         <div class="mt-2.5 pt-2 border-t border-gray-100 flex items-center justify-between">
           <span class="font-extrabold text-indigo-700 text-sm">${formatMoney(item.selling_price)}</span>
@@ -403,7 +412,8 @@ function addToCart(product) {
       unit_price: parseFloat(product.selling_price) || 0,
       unit_cost: parseFloat(product.cost_price) || 0,
       quantity: 1,
-      max_stock: 1
+      max_stock: 1,
+      image: product.image || ''
     });
 
     showToast(`Added handset ${product.title}`);
@@ -431,7 +441,8 @@ function addToCart(product) {
         unit_price: parseFloat(product.selling_price) || 0,
         unit_cost: parseFloat(product.cost_price) || 0,
         quantity: 1,
-        max_stock: product.stock_quantity
+        max_stock: product.stock_quantity,
+        image: product.image || ''
       });
     }
 
@@ -456,7 +467,7 @@ function updateCartQuantity(index, delta) {
     return;
   }
   if (newQty > item.max_stock) {
-    showToast(`Max available stock is ${item.max_stock}`, '⚠️');
+    showToast(`Cannot exceed current stock (${item.max_stock})`, '⚠️');
     return;
   }
 
@@ -511,18 +522,27 @@ function renderCart() {
 
     return `
       <div class="py-2 flex items-center justify-between text-xs gap-2">
-        <div class="flex-1 min-w-0">
-          <div class="flex items-center space-x-1.5">
-            <span class="font-mono text-[10px] px-1 bg-gray-100 rounded text-gray-600">${item.code}</span>
-            ${isPhone ? (
-              item.condition_grade && item.condition_grade.includes('Brand New')
-                ? `<span class="bg-blue-100 text-blue-800 text-[10px] font-extrabold px-1.5 py-0.5 rounded">✨ Brand New</span><span class="text-gray-600 text-[10px] font-medium">🛡️ ${item.warranty_type || 'Official 1-Year'}</span>`
-                : `<span class="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-1.5 py-0.5 rounded">${item.condition_grade}</span><span class="text-gray-600 text-[10px] font-medium">🔋 ${item.battery_health}%</span>`
-            ) : ''}
-          </div>
-          <p class="font-bold text-gray-800 truncate mt-0.5">${item.title}</p>
-          <div class="text-[11px] text-gray-500 font-medium mt-0.5">
-            ${formatMoney(item.unit_price)} each
+        <div class="flex items-center space-x-2 flex-1 min-w-0">
+          ${item.image ? `
+            <img src="${item.image}" alt="" class="w-8 h-8 rounded-md object-cover border border-gray-200 flex-shrink-0 shadow-xs">
+          ` : `
+            <div class="w-8 h-8 rounded-md bg-gray-100 border border-gray-200 flex items-center justify-center text-xs flex-shrink-0 text-gray-400">
+              ${isPhone ? '📱' : '📦'}
+            </div>
+          `}
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center space-x-1.5">
+              <span class="font-mono text-[10px] px-1 bg-gray-100 rounded text-gray-600">${item.code}</span>
+              ${isPhone ? (
+                item.condition_grade && item.condition_grade.includes('Brand New')
+                  ? `<span class="bg-blue-100 text-blue-800 text-[10px] font-extrabold px-1.5 py-0.5 rounded">✨ Brand New</span><span class="text-gray-600 text-[10px] font-medium">🛡️ ${item.warranty_type || 'Official 1-Year'}</span>`
+                  : `<span class="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-1.5 py-0.5 rounded">${item.condition_grade}</span><span class="text-gray-600 text-[10px] font-medium">🔋 ${item.battery_health}%</span>`
+              ) : ''}
+            </div>
+            <p class="font-bold text-gray-800 truncate mt-0.5">${item.title}</p>
+            <div class="text-[11px] text-gray-500 font-medium mt-0.5">
+              ${formatMoney(item.unit_price)} each
+            </div>
           </div>
         </div>
 
@@ -1164,6 +1184,77 @@ function startCameraScanForPhoneImei() {
 }
 
 /* =========================================================
+   PRODUCT PHOTO HANDLING & CLIENT-SIDE COMPRESSION
+========================================================= */
+function handleProductImageFile(input, prefix = 'item') {
+  if (!input.files || !input.files[0]) return;
+  const file = input.files[0];
+  compressAndLoadImage(file, (dataUrl) => {
+    setProductImagePreview(prefix, dataUrl);
+    showToast('Product photo attached!', '📷');
+  });
+  input.value = '';
+}
+
+function compressAndLoadImage(file, callback, maxWidth = 600, maxHeight = 600, quality = 0.75) {
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const img = new Image();
+    img.onload = function() {
+      const canvas = document.createElement('canvas');
+      let width = img.width;
+      let height = img.height;
+
+      if (width > height) {
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+      } else {
+        if (height > maxHeight) {
+          width = Math.round((width * maxHeight) / height);
+          height = maxHeight;
+        }
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+
+      const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+      callback(compressedDataUrl);
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function setProductImagePreview(prefix, dataUrl) {
+  const hiddenInput = document.getElementById(`${prefix}ImageData`);
+  const previewImg = document.getElementById(`${prefix}ImagePreview`);
+  const placeholder = document.getElementById(`${prefix}ImagePlaceholder`);
+  const removeBtn = document.getElementById(`${prefix}ImageRemoveBtn`);
+
+  if (hiddenInput) hiddenInput.value = dataUrl || '';
+  if (dataUrl) {
+    if (previewImg) {
+      previewImg.src = dataUrl;
+      previewImg.classList.remove('hidden');
+    }
+    if (placeholder) placeholder.classList.add('hidden');
+    if (removeBtn) removeBtn.classList.remove('hidden');
+  } else {
+    if (previewImg) {
+      previewImg.src = '';
+      previewImg.classList.add('hidden');
+    }
+    if (placeholder) placeholder.classList.remove('hidden');
+    if (removeBtn) removeBtn.classList.add('hidden');
+  }
+}
+
+/* =========================================================
    INVENTORY: ACCESSORIES TABLE & OPERATIONS
 ========================================================= */
 let inventorySearchTimer;
@@ -1205,7 +1296,12 @@ async function loadAccessoriesTable() {
       return `
         <tr class="hover:bg-gray-50 ${isLow ? 'bg-red-50/40' : ''}">
           <td class="px-4 py-3 font-mono font-semibold text-gray-800">${item.sku_or_barcode}</td>
-          <td class="px-4 py-3 font-bold text-gray-900">${item.title}</td>
+          <td class="px-4 py-3">
+            <div class="flex items-center space-x-2.5">
+              ${item.image ? `<img src="${item.image}" alt="" class="w-8 h-8 rounded-lg object-cover border border-gray-200 flex-shrink-0 shadow-xs">` : `<div class="w-8 h-8 rounded-lg bg-gray-100 border border-gray-200 flex items-center justify-center text-xs flex-shrink-0 text-gray-400">📦</div>`}
+              <span class="font-bold text-gray-900">${item.title}</span>
+            </div>
+          </td>
           <td class="px-4 py-3 text-gray-600">${item.category_name || 'General'}</td>
           <td class="px-4 py-3">
             ${item.rack_location ? `
@@ -1279,6 +1375,7 @@ function openAddItemModal() {
   document.getElementById('itemPrice').value = '';
   document.getElementById('itemStock').value = '10';
   document.getElementById('itemAlertLimit').value = '5';
+  setProductImagePreview('item', '');
   toggleInlineCategoryBox(false);
   openModal('modalItem');
   setTimeout(() => document.getElementById('itemTitle').focus(), 50);
@@ -1302,6 +1399,7 @@ async function openEditItemModal(id) {
     document.getElementById('itemPrice').value = item.selling_price;
     document.getElementById('itemStock').value = item.stock_quantity;
     document.getElementById('itemAlertLimit').value = item.min_alert_threshold;
+    setProductImagePreview('item', item.image || '');
     toggleInlineCategoryBox(false);
 
     openModal('modalItem');
@@ -1321,7 +1419,8 @@ async function handleSaveItem(e) {
     selling_price: parseFloat(document.getElementById('itemPrice').value) || 0,
     stock_quantity: parseInt(document.getElementById('itemStock').value, 10) || 0,
     min_alert_threshold: parseInt(document.getElementById('itemAlertLimit').value, 10) || 5,
-    rack_location: document.getElementById('itemRack').value.trim()
+    rack_location: document.getElementById('itemRack').value.trim(),
+    image: document.getElementById('itemImageData')?.value || ''
   };
 
   try {
@@ -1511,8 +1610,13 @@ async function loadPhonesTable() {
         <tr class="hover:bg-gray-50 ${isSold ? 'opacity-60 bg-gray-50' : ''}">
           <td class="px-4 py-3 font-mono font-bold text-gray-900">${p.imei_number}</td>
           <td class="px-4 py-3">
-            <span class="font-bold text-gray-900">${p.brand} ${p.model}</span>
-            ${p.notes ? `<p class="text-[10px] text-gray-500 truncate max-w-xs">${p.notes}</p>` : ''}
+            <div class="flex items-center space-x-2.5">
+              ${p.image ? `<img src="${p.image}" alt="" class="w-8 h-8 rounded-lg object-cover border border-gray-200 flex-shrink-0 shadow-xs">` : `<div class="w-8 h-8 rounded-lg bg-gray-100 border border-gray-200 flex items-center justify-center text-xs flex-shrink-0 text-gray-400">📱</div>`}
+              <div>
+                <span class="font-bold text-gray-900">${p.brand} ${p.model}</span>
+                ${p.notes ? `<p class="text-[10px] text-gray-500 truncate max-w-xs">${p.notes}</p>` : ''}
+              </div>
+            </div>
           </td>
           <td class="px-4 py-3 text-gray-600">${p.storage_capacity} / ${p.color || 'Standard'}</td>
           <td class="px-4 py-3 text-center">${conditionBadge}</td>
@@ -1581,6 +1685,7 @@ function openAddPhoneModal() {
   document.getElementById('phoneCost').value = '';
   document.getElementById('phonePrice').value = '';
   document.getElementById('phoneNotes').value = '';
+  setProductImagePreview('phone', '');
   document.getElementById('imeiFeedback').textContent = 'Must be unique per handset device.';
   document.getElementById('imeiFeedback').className = 'text-[11px] mt-1 text-gray-500';
 
@@ -1610,6 +1715,7 @@ async function openEditPhoneModal(id) {
     document.getElementById('phoneCost').value = phone.purchase_cost;
     document.getElementById('phonePrice').value = phone.selling_price;
     document.getElementById('phoneNotes').value = phone.notes || '';
+    setProductImagePreview('phone', phone.image || '');
 
     handlePhoneConditionChange();
     openModal('modalPhone');
@@ -1652,7 +1758,8 @@ async function handleSavePhone(e) {
     battery_health: parseInt(document.getElementById('phoneBattery').value, 10) || 100,
     purchase_cost: parseFloat(document.getElementById('phoneCost').value) || 0,
     selling_price: parseFloat(document.getElementById('phonePrice').value) || 0,
-    notes: document.getElementById('phoneNotes').value.trim()
+    notes: document.getElementById('phoneNotes').value.trim(),
+    image: document.getElementById('phoneImageData')?.value || ''
   };
 
   try {

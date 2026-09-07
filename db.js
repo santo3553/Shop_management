@@ -105,6 +105,7 @@ function initSchema() {
       stock_quantity INTEGER NOT NULL DEFAULT 0,
       min_alert_threshold INTEGER NOT NULL DEFAULT 5,
       rack_location TEXT DEFAULT '',
+      image TEXT DEFAULT '',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
@@ -123,6 +124,7 @@ function initSchema() {
       selling_price REAL NOT NULL DEFAULT 0.00,
       status TEXT NOT NULL DEFAULT 'In-Stock' CHECK(status IN ('In-Stock', 'Sold', 'Returned')),
       notes TEXT DEFAULT '',
+      image TEXT DEFAULT '',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       sold_at DATETIME
     );
@@ -187,6 +189,14 @@ function initSchema() {
     CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id);
     CREATE INDEX IF NOT EXISTS idx_emi_payments_order ON emi_payments(order_id);
   `);
+
+  // Safe schema migrations for existing databases
+  try {
+    db.exec("ALTER TABLE items ADD COLUMN image TEXT DEFAULT ''");
+  } catch (_) {}
+  try {
+    db.exec("ALTER TABLE phones ADD COLUMN image TEXT DEFAULT ''");
+  } catch (_) {}
 }
 
 /**

@@ -8,7 +8,8 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '20mb' }));
+app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Helper to get local network IPv4 addresses
@@ -101,7 +102,8 @@ app.post('/api/items', (req, res) => {
       selling_price = 0,
       stock_quantity = 0,
       min_alert_threshold = 5,
-      rack_location = ''
+      rack_location = '',
+      image = ''
     } = req.body;
 
     if (!sku_or_barcode || !sku_or_barcode.trim()) {
@@ -112,8 +114,8 @@ app.post('/api/items', (req, res) => {
     }
 
     const stmt = db.prepare(`
-      INSERT INTO items (sku_or_barcode, title, category_id, cost_price, selling_price, stock_quantity, min_alert_threshold, rack_location)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO items (sku_or_barcode, title, category_id, cost_price, selling_price, stock_quantity, min_alert_threshold, rack_location, image)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const result = stmt.run(
@@ -124,7 +126,8 @@ app.post('/api/items', (req, res) => {
       parseFloat(selling_price) || 0,
       parseInt(stock_quantity, 10) || 0,
       parseInt(min_alert_threshold, 10) || 5,
-      (rack_location || '').trim()
+      (rack_location || '').trim(),
+      image || ''
     );
 
     const newItem = db.prepare(`
@@ -154,12 +157,13 @@ app.put('/api/items/:id', (req, res) => {
       selling_price,
       stock_quantity,
       min_alert_threshold,
-      rack_location = ''
+      rack_location = '',
+      image = ''
     } = req.body;
 
     const stmt = db.prepare(`
       UPDATE items
-      SET sku_or_barcode = ?, title = ?, category_id = ?, cost_price = ?, selling_price = ?, stock_quantity = ?, min_alert_threshold = ?, rack_location = ?, updated_at = CURRENT_TIMESTAMP
+      SET sku_or_barcode = ?, title = ?, category_id = ?, cost_price = ?, selling_price = ?, stock_quantity = ?, min_alert_threshold = ?, rack_location = ?, image = ?, updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `);
 
@@ -172,6 +176,7 @@ app.put('/api/items/:id', (req, res) => {
       parseInt(stock_quantity, 10) || 0,
       parseInt(min_alert_threshold, 10) || 5,
       (rack_location || '').trim(),
+      image || '',
       id
     );
 
@@ -294,7 +299,8 @@ app.post('/api/phones', (req, res) => {
       purchase_cost = 0,
       selling_price = 0,
       status = 'In-Stock',
-      notes = ''
+      notes = '',
+      image = ''
     } = req.body;
 
     if (!imei_number || !imei_number.trim()) {
@@ -305,8 +311,8 @@ app.post('/api/phones', (req, res) => {
     }
 
     const stmt = db.prepare(`
-      INSERT INTO phones (imei_number, brand, model, storage_capacity, color, condition_grade, battery_health, warranty_type, purchase_cost, selling_price, status, notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO phones (imei_number, brand, model, storage_capacity, color, condition_grade, battery_health, warranty_type, purchase_cost, selling_price, status, notes, image)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const result = stmt.run(
@@ -321,7 +327,8 @@ app.post('/api/phones', (req, res) => {
       parseFloat(purchase_cost) || 0,
       parseFloat(selling_price) || 0,
       status,
-      notes ? notes.trim() : ''
+      notes ? notes.trim() : '',
+      image || ''
     );
 
     const newPhone = db.prepare('SELECT * FROM phones WHERE id = ?').get(result.lastInsertRowid);
@@ -349,12 +356,13 @@ app.put('/api/phones/:id', (req, res) => {
       purchase_cost,
       selling_price,
       status,
-      notes
+      notes,
+      image = ''
     } = req.body;
 
     const stmt = db.prepare(`
       UPDATE phones
-      SET imei_number = ?, brand = ?, model = ?, storage_capacity = ?, color = ?, condition_grade = ?, battery_health = ?, warranty_type = ?, purchase_cost = ?, selling_price = ?, status = ?, notes = ?
+      SET imei_number = ?, brand = ?, model = ?, storage_capacity = ?, color = ?, condition_grade = ?, battery_health = ?, warranty_type = ?, purchase_cost = ?, selling_price = ?, status = ?, notes = ?, image = ?
       WHERE id = ?
     `);
 
@@ -371,6 +379,7 @@ app.put('/api/phones/:id', (req, res) => {
       parseFloat(selling_price) || 0,
       status,
       notes || '',
+      image || '',
       id
     );
 
@@ -415,7 +424,7 @@ app.get('/api/pos/search', (req, res) => {
     if (!query) {
       // Return top available accessories and in-stock phones
       const defaultAccessories = db.prepare(`
-        SELECT id, sku_or_barcode as code, title, category_id, 'accessory' as type, selling_price, stock_quantity, cost_price
+        SELECT id, sku_or_barcode as code, title, category_id, 'accessory' as type, selling_price, stock_quantity, cost_price, image
         FROM items
         WHERE stock_quantity > 0
         ORDER BY stock_quantity DESC
@@ -424,7 +433,7 @@ app.get('/api/pos/search', (req, res) => {
 
       const defaultPhones = db.prepare(`
         SELECT id, imei_number as code, brand || ' ' || model || ' (' || storage_capacity || ')' as title,
-               'phone' as type, selling_price, 1 as stock_quantity, purchase_cost as cost_price, condition_grade, battery_health, warranty_type
+               'phone' as type, selling_price, 1 as stock_quantity, purchase_cost as cost_price, condition_grade, battery_health, warranty_type, image
         FROM phones
         WHERE status = 'In-Stock'
         ORDER BY created_at DESC
@@ -436,7 +445,7 @@ app.get('/api/pos/search', (req, res) => {
 
     // 1. Direct barcode / SKU search
     const exactAccessory = db.prepare(`
-      SELECT id, sku_or_barcode as code, title, category_id, 'accessory' as type, selling_price, stock_quantity, cost_price
+      SELECT id, sku_or_barcode as code, title, category_id, 'accessory' as type, selling_price, stock_quantity, cost_price, image
       FROM items
       WHERE sku_or_barcode = ?
     `).get(query);
@@ -444,7 +453,7 @@ app.get('/api/pos/search', (req, res) => {
     // 2. Direct IMEI match
     const exactPhone = db.prepare(`
       SELECT id, imei_number as code, brand || ' ' || model || ' (' || storage_capacity || ')' as title,
-             'phone' as type, selling_price, 1 as stock_quantity, purchase_cost as cost_price, condition_grade, battery_health, warranty_type, status
+             'phone' as type, selling_price, 1 as stock_quantity, purchase_cost as cost_price, condition_grade, battery_health, warranty_type, status, image
       FROM phones
       WHERE imei_number = ?
     `).get(query);
@@ -461,7 +470,7 @@ app.get('/api/pos/search', (req, res) => {
     const pattern = `%${query}%`;
 
     const accessories = db.prepare(`
-      SELECT id, sku_or_barcode as code, title, category_id, 'accessory' as type, selling_price, stock_quantity, cost_price
+      SELECT id, sku_or_barcode as code, title, category_id, 'accessory' as type, selling_price, stock_quantity, cost_price, image
       FROM items
       WHERE title LIKE ? OR sku_or_barcode LIKE ?
       LIMIT 50
@@ -469,7 +478,7 @@ app.get('/api/pos/search', (req, res) => {
 
     const phones = db.prepare(`
       SELECT id, imei_number as code, brand || ' ' || model || ' (' || storage_capacity || ')' as title,
-             'phone' as type, selling_price, 1 as stock_quantity, purchase_cost as cost_price, condition_grade, battery_health, warranty_type
+             'phone' as type, selling_price, 1 as stock_quantity, purchase_cost as cost_price, condition_grade, battery_health, warranty_type, image
       FROM phones
       WHERE status = 'In-Stock' AND (imei_number LIKE ? OR brand LIKE ? OR model LIKE ?)
       LIMIT 25
