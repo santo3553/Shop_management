@@ -104,6 +104,18 @@ function switchTab(tabName) {
     activeBtn.classList.remove('text-indigo-200');
   }
 
+  // Update mobile nav buttons
+  document.querySelectorAll('.mob-tab-btn').forEach(btn => {
+    btn.classList.remove('text-white', 'bg-indigo-900', 'font-bold');
+    btn.classList.add('text-indigo-300', 'font-medium');
+  });
+
+  const activeMobBtn = document.getElementById(`mobTab-${tabName}`);
+  if (activeMobBtn) {
+    activeMobBtn.classList.add('text-white', 'bg-indigo-900', 'font-bold');
+    activeMobBtn.classList.remove('text-indigo-300', 'font-medium');
+  }
+
   // Update view panes
   document.querySelectorAll('.tab-pane').forEach(pane => {
     pane.classList.add('hidden');

@@ -16,22 +16,22 @@
 
   <!-- TOP APP BAR -->
   <header class="app-header bg-indigo-900 text-white shadow-md sticky top-0 z-40">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="flex items-center justify-between h-16">
+    <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between min-h-[56px] sm:min-h-[64px] py-1.5 sm:py-2">
         
         <!-- BRAND LOGO & INFO -->
-        <div class="flex items-center space-x-3">
-          <img src="logo.png" class="w-10 h-10 rounded-lg object-contain bg-black shadow-md border border-indigo-700/60 p-0.5" alt="MDT Logo">
-          <div>
+        <div class="flex items-center space-x-2.5 sm:space-x-3 min-w-0">
+          <img src="logo.png" class="w-9 h-9 sm:w-10 sm:h-10 rounded-lg object-contain bg-black shadow-md border border-indigo-700/60 p-0.5 flex-shrink-0" alt="MDT Logo">
+          <div class="min-w-0">
             <div class="flex items-center space-x-2">
-              <h1 class="text-xl font-extrabold tracking-tight">Mobile Decor &amp; Tech</h1>
-              <span class="text-xs bg-indigo-700 text-indigo-200 px-2 py-0.5 rounded-full font-medium">Smartphones &amp; Accessories</span>
+              <h1 class="text-base sm:text-lg md:text-xl font-extrabold tracking-tight truncate whitespace-nowrap">Mobile Decor &amp; Tech</h1>
+              <span class="hidden md:inline-flex text-xs bg-indigo-700 text-indigo-200 px-2 py-0.5 rounded-full font-medium">Smartphones &amp; Accessories</span>
             </div>
-            <p class="text-xs text-indigo-300">POS &amp; IMEI Inventory System</p>
+            <p class="hidden sm:block text-xs text-indigo-300">POS &amp; IMEI Inventory System</p>
           </div>
         </div>
 
-        <!-- NAVIGATION TABS -->
+        <!-- NAVIGATION TABS (Desktop / Tablet) -->
         <nav class="hidden md:flex space-x-1" id="mainNav">
           <button onclick="switchTab('pos')" id="tabBtn-pos" class="tab-btn active px-3 py-2 rounded-md text-sm font-semibold flex items-center space-x-1.5 transition">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
@@ -55,32 +55,32 @@
         </nav>
 
         <!-- LAN & SYSTEM STATUS -->
-        <div class="flex items-center space-x-3 text-xs">
+        <div class="flex items-center space-x-2 text-xs flex-shrink-0">
           <div class="hidden lg:flex items-center bg-indigo-800/80 px-2.5 py-1.5 rounded-md border border-indigo-700/50 text-indigo-200" title="Access this POS from other devices on Wi-Fi">
             <svg class="w-3.5 h-3.5 mr-1.5 text-emerald-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3 5a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2h-2.22l.123.489.804.804A1 1 0 0113 18H7a1 1 0 01-.707-1.707l.804-.804L7.22 15H5a2 2 0 01-2-2V5zm5.771 7H11.23l-.624-2.497A1 1 0 009.638 9h-.276a1 1 0 00-.968.503L7.771 12z" clip-rule="evenodd"/></svg>
             <span>LAN: <strong class="text-white" id="lanIpDisplay">Local Network Ready</strong></span>
           </div>
-          <div class="flex items-center space-x-1.5 bg-emerald-900/60 text-emerald-300 px-2 py-1 rounded border border-emerald-700/40">
+          <div class="flex items-center space-x-1.5 bg-emerald-900/60 text-emerald-300 px-2.5 py-1 rounded-md border border-emerald-700/40 text-[11px] whitespace-nowrap font-semibold">
             <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span class="font-medium">Offline Ready</span>
+            <span>Offline Ready</span>
           </div>
         </div>
 
       </div>
     </div>
 
-    <!-- Mobile Nav Bar -->
-    <div class="mobile-nav-bar md:hidden flex border-t border-indigo-800 bg-indigo-950 px-2 py-1 justify-around text-xs">
-      <button onclick="switchTab('pos')" class="px-2 py-1.5 font-medium text-white flex flex-col items-center">
+    <!-- Mobile Nav Bar (Phone Screens) -->
+    <div class="mobile-nav-bar md:hidden flex border-t border-indigo-800/80 bg-indigo-950 px-2 py-1 justify-around text-xs relative z-10">
+      <button onclick="switchTab('pos')" id="mobTab-pos" class="mob-tab-btn px-3 py-1.5 rounded-md font-bold text-white bg-indigo-900 flex flex-col items-center transition">
         <span>POS</span>
       </button>
-      <button onclick="switchTab('inventory')" class="px-2 py-1.5 font-medium text-indigo-300 flex flex-col items-center">
+      <button onclick="switchTab('inventory')" id="mobTab-inventory" class="mob-tab-btn px-3 py-1.5 rounded-md font-medium text-indigo-300 flex flex-col items-center transition">
         <span>Inventory</span>
       </button>
-      <button onclick="switchTab('orders')" class="px-2 py-1.5 font-medium text-indigo-300 flex flex-col items-center">
+      <button onclick="switchTab('orders')" id="mobTab-orders" class="mob-tab-btn px-3 py-1.5 rounded-md font-medium text-indigo-300 flex flex-col items-center transition">
         <span>Invoices</span>
       </button>
-      <button onclick="switchTab('reports')" class="px-2 py-1.5 font-medium text-indigo-300 flex flex-col items-center">
+      <button onclick="switchTab('reports')" id="mobTab-reports" class="mob-tab-btn px-3 py-1.5 rounded-md font-medium text-indigo-300 flex flex-col items-center transition">
         <span>Reports</span>
       </button>
     </div>
