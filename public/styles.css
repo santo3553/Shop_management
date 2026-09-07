@@ -2,6 +2,45 @@
    BIPLOB SHOP - STYLES & PRINT MEDIA CSS
 ========================================================= */
 
+/* =========================================================
+   SAFE AREA & NOTCH INSETS (Camera Punch Hole / Status Bar)
+========================================================= */
+:root {
+  --safe-area-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+  --safe-area-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+  --safe-area-left: var(--safe-area-inset-left, env(safe-area-inset-left, 0px));
+  --safe-area-right: var(--safe-area-inset-right, env(safe-area-inset-right, 0px));
+}
+
+/* Responsive header safe area for status bar / notch / camera bump */
+.app-header {
+  padding-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+/* On standalone mobile or native Android app container, ensure minimum clearance so header never sits under camera bump */
+.is-native-mobile .app-header {
+  padding-top: max(32px, var(--safe-area-inset-top, env(safe-area-inset-top, 32px)));
+}
+
+/* Mobile bottom nav safe area (avoids Android gesture bar) */
+.mobile-nav-bar {
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), var(--safe-area-inset-bottom, 0px));
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+.is-native-mobile .mobile-nav-bar {
+  padding-bottom: max(10px, var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
+}
+
+/* Modals safe area on mobile */
+.is-native-mobile dialog {
+  max-height: calc(100vh - var(--safe-area-inset-top, 36px) - 24px);
+  margin-top: calc(var(--safe-area-inset-top, 36px) + 8px);
+}
+
 /* Keyboard hint styling */
 .kbd-hint {
   font-size: 10px;

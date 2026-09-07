@@ -2,6 +2,24 @@
    BIPLOB SHOP - FRONTEND APPLICATION JAVASCRIPT
 ========================================================= */
 
+// Native Mobile / Capacitor Safe Area Inset Initialization
+(function initMobileSafeArea() {
+  const isCapacitor = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+  const isMobileScreen = window.innerWidth <= 768;
+  if (isCapacitor || (isMobileScreen && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent))) {
+    document.documentElement.classList.add('is-native-mobile');
+    const updateInsets = () => {
+      const currentTop = getComputedStyle(document.documentElement).getPropertyValue('--safe-area-inset-top');
+      if (!currentTop || currentTop.trim() === '' || currentTop.trim() === '0px') {
+        document.documentElement.style.setProperty('--safe-area-inset-top', '36px');
+      }
+    };
+    updateInsets();
+    setTimeout(updateInsets, 100);
+    setTimeout(updateInsets, 500);
+  }
+})();
+
 // Global State
 const state = {
   activeTab: 'pos',
