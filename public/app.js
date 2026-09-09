@@ -72,13 +72,49 @@ function showToast(message, icon = '✅') {
 // Modal Helpers
 function openModal(id) {
   const modal = document.getElementById(id);
-  if (modal) modal.showModal();
+  if (!modal) return;
+  try {
+    if (typeof modal.showModal === 'function') {
+      modal.showModal();
+    } else {
+      modal.setAttribute('open', '');
+    }
+  } catch (err) {
+    console.warn(`openModal(${id}) notice:`, err);
+  }
 }
 
 function closeModal(id) {
   const modal = document.getElementById(id);
-  if (modal) modal.close();
+  if (!modal) return;
+  try {
+    if (typeof modal.close === 'function') {
+      modal.close();
+    } else {
+      modal.removeAttribute('open');
+    }
+  } catch (err) {
+    modal.removeAttribute('open');
+  }
 }
+
+// Auto-dismiss dialog when clicking on backdrop
+document.addEventListener('click', (e) => {
+  if (e.target && e.target.tagName === 'DIALOG' && e.target.hasAttribute('open')) {
+    const rect = e.target.getBoundingClientRect();
+    const isInDialog = (
+      rect.top <= e.clientY && e.clientY <= rect.top + rect.height &&
+      rect.left <= e.clientX && e.clientX <= rect.left + rect.width
+    );
+    if (!isInDialog) {
+      if (typeof e.target.close === 'function') {
+        e.target.close();
+      } else {
+        e.target.removeAttribute('open');
+      }
+    }
+  }
+});
 
 // Number & Currency Formatting
 function formatMoney(amount) {
