@@ -54,16 +54,22 @@
           </button>
         </nav>
 
-        <!-- LAN & CLOUD SYNC STATUS -->
+        <!-- SECURITY ROLE, 1-TAP BACKUP & CLOUD SYNC -->
         <div class="flex items-center space-x-1.5 sm:space-x-2 text-xs flex-shrink-0">
+          <button onclick="openSecurityModal()" id="roleBadge" class="flex items-center space-x-1.5 bg-indigo-950/70 text-indigo-200 px-2 py-1 sm:px-2.5 sm:py-1 rounded-md border border-indigo-700/50 text-[11px] font-semibold cursor-pointer hover:bg-indigo-900 transition shadow-sm" title="Click to unlock Owner View or lock to Staff Mode">
+            <span class="w-2 h-2 rounded-full bg-blue-400"></span>
+            <span>👤 Staff Mode</span>
+          </button>
+          <button onclick="triggerDailyBackup()" id="dailyBackupBtn" class="flex items-center space-x-1 bg-amber-600 hover:bg-amber-700 text-white font-bold px-2 py-1 rounded-md text-[11px] transition shadow-sm" title="Export encrypted daily backup to WhatsApp">
+            <span>💾 Backup</span>
+          </button>
           <button onclick="openCloudSyncModal()" id="cloudSyncBadge" class="flex items-center space-x-1.5 bg-indigo-900/60 text-indigo-200 px-2.5 py-1 rounded-md border border-indigo-700/50 text-[11px] font-semibold cursor-pointer hover:bg-indigo-800 transition shadow-sm">
             <span id="cloudSyncDot" class="w-2 h-2 rounded-full bg-gray-400"></span>
             <span id="cloudSyncText">Local Mode</span>
           </button>
-          <div class="flex items-center space-x-1.5 bg-emerald-900/60 text-emerald-300 px-2.5 py-1 rounded-md border border-emerald-700/40 text-[11px] whitespace-nowrap font-semibold">
+          <div class="hidden sm:flex items-center space-x-1.5 bg-emerald-900/60 text-emerald-300 px-2.5 py-1 rounded-md border border-emerald-700/40 text-[11px] whitespace-nowrap font-semibold">
             <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span class="hidden sm:inline">Offline Ready</span>
-            <span class="sm:hidden">Offline</span>
+            <span>Offline Ready</span>
           </div>
         </div>
 
@@ -461,7 +467,7 @@
                 <th class="px-4 py-3">Title / Description</th>
                 <th class="px-4 py-3">Category</th>
                 <th class="px-4 py-3">Tak / Location</th>
-                <th class="px-4 py-3 text-right">Cost Price</th>
+                <th class="px-4 py-3 text-right owner-only-stat">Cost Price</th>
                 <th class="px-4 py-3 text-right">Selling Price</th>
                 <th class="px-4 py-3 text-center">In-Stock</th>
                 <th class="px-4 py-3 text-center">Alert Limit</th>
@@ -521,9 +527,9 @@
                 <th class="px-4 py-3">Storage / Color</th>
                 <th class="px-4 py-3 text-center">Type / Condition</th>
                 <th class="px-4 py-3 text-center">Warranty / Battery</th>
-                <th class="px-4 py-3 text-right">Cost Price</th>
+                <th class="px-4 py-3 text-right owner-only-stat">Cost Price</th>
                 <th class="px-4 py-3 text-right">Selling Price</th>
-                <th class="px-4 py-3 text-right">Margin Est.</th>
+                <th class="px-4 py-3 text-right owner-only-stat">Margin Est.</th>
                 <th class="px-4 py-3 text-center">Status</th>
                 <th class="px-4 py-3 text-right">Actions</th>
               </tr>
@@ -588,7 +594,7 @@
                   <th class="px-4 py-3">SKU / IMEI</th>
                   <th class="px-4 py-3">Category / Brand</th>
                   <th class="px-4 py-3">Tak / Location</th>
-                  <th class="px-4 py-3 text-right">Cost Price</th>
+                  <th class="px-4 py-3 text-right owner-only-stat">Cost Price</th>
                   <th class="px-4 py-3 text-right">Selling Price</th>
                   <th class="px-4 py-3 text-center">Current Stock</th>
                   <th class="px-4 py-3 text-right">Quick Restock &amp; Actions</th>
@@ -645,7 +651,7 @@
                 <th class="px-4 py-3 text-right">Total Device Price</th>
                 <th class="px-4 py-3 text-right">Discount</th>
                 <th class="px-4 py-3 text-right">Due / Paid</th>
-                <th class="px-4 py-3 text-right">Net Profit</th>
+                <th class="px-4 py-3 text-right owner-only-stat">Net Profit</th>
                 <th class="px-4 py-3 text-center">Actions</th>
               </tr>
             </thead>
@@ -1452,6 +1458,257 @@
     </div>
   </dialog>
 
+  <!-- =========================================================
+       SECURITY MODAL 1: PIN CHALLENGE (NUMPAD & INPUT)
+  ========================================================= -->
+  <div id="modalPinChallenge" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs hidden items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-xs w-full overflow-hidden border border-gray-200 animate-in fade-in zoom-in-95 duration-150">
+      <div class="bg-gradient-to-r from-indigo-900 to-indigo-950 p-4 text-white text-center relative">
+        <div class="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center mx-auto mb-2 text-2xl shadow-inner">
+          🔒
+        </div>
+        <h3 id="pinChallengeTitle" class="text-sm font-bold tracking-tight">Owner Authorization Required</h3>
+        <p id="pinChallengeSubtitle" class="text-[11px] text-indigo-200 mt-0.5">Please enter 4-digit Owner PIN</p>
+      </div>
+
+      <div class="p-5 space-y-4">
+        <div>
+          <input
+            type="password"
+            id="pinChallengeInput"
+            maxlength="6"
+            inputmode="numeric"
+            pattern="[0-9]*"
+            class="w-full text-center text-2xl tracking-[0.4em] font-mono font-bold py-2.5 bg-gray-50 border-2 border-indigo-200 rounded-xl focus:bg-white focus:border-indigo-600 focus:outline-none"
+            placeholder="••••"
+            autocomplete="off"
+            onkeydown="if(event.key==='Enter') AuthSecurity.submitPinChallenge()"
+          >
+          <div id="pinChallengeError" class="text-red-500 text-[11px] font-bold text-center mt-1.5 hidden">
+            ❌ Incorrect PIN. Try again.
+          </div>
+        </div>
+
+        <!-- Quick Numpad for Touchscreen Android -->
+        <div class="grid grid-cols-3 gap-1.5">
+          <button type="button" onclick="document.getElementById('pinChallengeInput').value += '1'" class="py-2.5 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 font-bold text-base rounded-lg text-gray-800 transition">1</button>
+          <button type="button" onclick="document.getElementById('pinChallengeInput').value += '2'" class="py-2.5 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 font-bold text-base rounded-lg text-gray-800 transition">2</button>
+          <button type="button" onclick="document.getElementById('pinChallengeInput').value += '3'" class="py-2.5 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 font-bold text-base rounded-lg text-gray-800 transition">3</button>
+          <button type="button" onclick="document.getElementById('pinChallengeInput').value += '4'" class="py-2.5 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 font-bold text-base rounded-lg text-gray-800 transition">4</button>
+          <button type="button" onclick="document.getElementById('pinChallengeInput').value += '5'" class="py-2.5 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 font-bold text-base rounded-lg text-gray-800 transition">5</button>
+          <button type="button" onclick="document.getElementById('pinChallengeInput').value += '6'" class="py-2.5 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 font-bold text-base rounded-lg text-gray-800 transition">6</button>
+          <button type="button" onclick="document.getElementById('pinChallengeInput').value += '7'" class="py-2.5 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 font-bold text-base rounded-lg text-gray-800 transition">7</button>
+          <button type="button" onclick="document.getElementById('pinChallengeInput').value += '8'" class="py-2.5 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 font-bold text-base rounded-lg text-gray-800 transition">8</button>
+          <button type="button" onclick="document.getElementById('pinChallengeInput').value += '9'" class="py-2.5 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 font-bold text-base rounded-lg text-gray-800 transition">9</button>
+          <button type="button" onclick="const p = document.getElementById('pinChallengeInput'); p.value = p.value.slice(0, -1)" class="py-2.5 bg-gray-200 hover:bg-gray-300 active:bg-gray-400 font-bold text-sm rounded-lg text-gray-700 transition">⌫</button>
+          <button type="button" onclick="document.getElementById('pinChallengeInput').value += '0'" class="py-2.5 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 font-bold text-base rounded-lg text-gray-800 transition">0</button>
+          <button type="button" onclick="document.getElementById('pinChallengeInput').value = ''" class="py-2.5 bg-gray-200 hover:bg-gray-300 active:bg-gray-400 font-bold text-xs rounded-lg text-gray-700 transition">CLR</button>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2 pt-1">
+          <button type="button" onclick="AuthSecurity.closePinModal()" class="w-full py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-xl transition">
+            Cancel
+          </button>
+          <button type="button" onclick="AuthSecurity.submitPinChallenge()" class="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-md transition active:scale-95">
+            Authorize
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       SECURITY MODAL 2: SECURITY SETTINGS & ROLE MANAGEMENT
+  ========================================================= -->
+  <dialog id="modalSecuritySettings" class="p-0 rounded-2xl shadow-2xl max-w-md w-full bg-white backdrop:bg-black/50 overflow-hidden">
+    <div class="bg-gradient-to-r from-indigo-900 via-indigo-800 to-indigo-950 p-4 text-white flex justify-between items-center">
+      <div class="flex items-center space-x-2.5">
+        <div class="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-lg">
+          🛡️
+        </div>
+        <div>
+          <h3 class="font-bold text-sm">Security &amp; Access Control</h3>
+          <p class="text-[11px] text-indigo-200">Role Permissions &amp; Disaster Recovery</p>
+        </div>
+      </div>
+      <button onclick="closeModal('modalSecuritySettings')" class="text-indigo-200 hover:text-white text-lg font-bold p-1">&times;</button>
+    </div>
+
+    <div class="p-4 space-y-4 max-h-[80vh] overflow-y-auto text-xs text-gray-700">
+      
+      <!-- Current Role Status -->
+      <div class="bg-gray-50 border border-gray-200 rounded-xl p-3 flex items-center justify-between">
+        <div>
+          <span class="text-[10px] text-gray-400 uppercase font-bold tracking-wider block">Active Session Role</span>
+          <span id="secCurrentRoleText" class="text-sm font-black text-gray-800">👤 Staff Mode</span>
+          <p class="text-[10px] text-gray-500 mt-0.5" id="secRoleDesc">Wholesale costs, profit analytics, and sensitive records are concealed.</p>
+        </div>
+        <div id="secRoleActionContainer">
+          <button onclick="switchRoleAction()" id="secRoleBtn" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-xs shadow-sm transition">
+            👑 Unlock Owner
+          </button>
+        </div>
+      </div>
+
+      <!-- Change Owner PIN -->
+      <div class="border border-gray-200 rounded-xl p-3 space-y-2">
+        <div class="font-bold text-gray-800 flex items-center space-x-1">
+          <span>👑</span>
+          <span>Change Owner PIN (Default: 1234)</span>
+        </div>
+        <p class="text-[11px] text-gray-500">Owner PIN protects profit reports, invoice voiding, database resets, and high discounts.</p>
+        <div class="grid grid-cols-3 gap-1.5 pt-1">
+          <input type="password" id="secOldOwnerPin" placeholder="Old PIN" maxlength="6" inputmode="numeric" class="px-2 py-1.5 border rounded-lg text-xs font-mono text-center">
+          <input type="password" id="secNewOwnerPin" placeholder="New PIN" maxlength="6" inputmode="numeric" class="px-2 py-1.5 border rounded-lg text-xs font-mono text-center">
+          <button onclick="handleUpdateOwnerPin()" class="bg-indigo-50 hover:bg-indigo-600 hover:text-white text-indigo-700 font-bold px-2 py-1.5 rounded-lg border border-indigo-200 transition text-[11px]">
+            Save PIN
+          </button>
+        </div>
+      </div>
+
+      <!-- Change Staff PIN -->
+      <div class="border border-gray-200 rounded-xl p-3 space-y-2">
+        <div class="font-bold text-gray-800 flex items-center space-x-1">
+          <span>👤</span>
+          <span>Change Staff PIN (Default: 0000)</span>
+        </div>
+        <p class="text-[11px] text-gray-500">Used by sales floor employees to operate the register.</p>
+        <div class="grid grid-cols-3 gap-1.5 pt-1">
+          <input type="password" id="secStaffOwnerAuthPin" placeholder="Owner PIN" maxlength="6" inputmode="numeric" class="px-2 py-1.5 border rounded-lg text-xs font-mono text-center">
+          <input type="password" id="secNewStaffPin" placeholder="New Staff PIN" maxlength="6" inputmode="numeric" class="px-2 py-1.5 border rounded-lg text-xs font-mono text-center">
+          <button onclick="handleUpdateStaffPin()" class="bg-indigo-50 hover:bg-indigo-600 hover:text-white text-indigo-700 font-bold px-2 py-1.5 rounded-lg border border-indigo-200 transition text-[11px]">
+            Save PIN
+          </button>
+        </div>
+      </div>
+
+      <!-- Backup & Disaster Recovery -->
+      <div class="border border-amber-200 bg-amber-50/40 rounded-xl p-3 space-y-2.5">
+        <div class="font-bold text-amber-900 flex items-center justify-between">
+          <span class="flex items-center space-x-1">
+            <span>💾</span>
+            <span>Disaster Recovery &amp; Cloud Backup</span>
+          </span>
+          <span class="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-bold">Encrypted</span>
+        </div>
+        <p class="text-[11px] text-gray-600">
+          Save an encrypted snapshot of all phones, accessories, and orders directly to Android Downloads and send it to your WhatsApp.
+        </p>
+        <div class="grid grid-cols-2 gap-2 pt-1">
+          <button onclick="triggerDailyBackup()" class="py-2 px-3 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs shadow-sm transition flex items-center justify-center space-x-1">
+            <span>💾 Backup Now</span>
+          </button>
+          <button onclick="openRestoreModal()" class="py-2 px-3 bg-white hover:bg-gray-50 text-gray-700 font-bold rounded-xl text-xs border border-gray-300 transition flex items-center justify-center space-x-1">
+            <span>📥 Restore DB</span>
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </dialog>
+
+  <!-- =========================================================
+       SECURITY MODAL 3: VOID INVOICE (AUDIT TRAIL & RESTOCK)
+  ========================================================= -->
+  <dialog id="modalVoidInvoice" class="p-0 rounded-2xl shadow-2xl max-w-sm w-full bg-white backdrop:bg-black/60 overflow-hidden">
+    <div class="bg-gradient-to-r from-red-600 to-red-800 p-4 text-white">
+      <div class="flex justify-between items-start">
+        <div class="flex items-center space-x-2">
+          <span class="text-xl">🚫</span>
+          <div>
+            <h3 class="font-bold text-sm">Void Sales Invoice</h3>
+            <p id="voidInvoiceSubtitle" class="text-[11px] text-red-100">Invoice: INV-000000</p>
+          </div>
+        </div>
+        <button onclick="closeModal('modalVoidInvoice')" class="text-red-200 hover:text-white text-lg font-bold">&times;</button>
+      </div>
+    </div>
+
+    <div class="p-4 space-y-3.5 text-xs text-gray-700">
+      <input type="hidden" id="voidInvoiceId">
+
+      <div class="bg-red-50 border border-red-200 rounded-xl p-3 space-y-1 text-[11px] text-red-800">
+        <div class="font-bold flex items-center space-x-1">
+          <span>⚠️</span>
+          <span>Stock Auto-Replenishment:</span>
+        </div>
+        <p>
+          Voiding will cancel this transaction and automatically mark all handsets back to <strong>"In-Stock"</strong> and restore accessory quantities.
+        </p>
+      </div>
+
+      <div>
+        <label class="block font-bold text-gray-700 mb-1">Reason for Voiding *</label>
+        <select id="voidReasonSelect" class="w-full px-2.5 py-2 border border-gray-300 rounded-lg text-xs focus:ring-1 focus:ring-red-500 font-semibold bg-white">
+          <option value="Customer Return / Refund">Customer Return / Refund</option>
+          <option value="Wrong Item / Barcode Scanned">Wrong Item / Barcode Scanned</option>
+          <option value="Order Cancelled by Customer">Order Cancelled by Customer</option>
+          <option value="Payment Issue / Card Declined">Payment Issue / Card Declined</option>
+          <option value="Duplicate Order Entry">Duplicate Order Entry</option>
+          <option value="Damaged / Defective Stock">Damaged / Defective Stock</option>
+          <option value="Other">Other (Specify below)</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="block font-bold text-gray-700 mb-1">Additional Notes (Optional)</label>
+        <textarea id="voidNotesInput" rows="2" placeholder="e.g. customer changed mind, swapped color..." class="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg text-xs focus:ring-1 focus:ring-red-500"></textarea>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2 pt-1 border-t border-gray-100">
+        <button type="button" onclick="closeModal('modalVoidInvoice')" class="py-2 bg-gray-100 hover:bg-gray-200 font-bold text-xs rounded-xl text-gray-700 transition">
+          Cancel
+        </button>
+        <button type="button" onclick="executeVoidInvoice()" class="py-2 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-xl shadow-md transition active:scale-95">
+          Confirm Void
+        </button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- =========================================================
+       SECURITY MODAL 4: RESTORE DATABASE FROM BACKUP
+  ========================================================= -->
+  <dialog id="modalRestoreBackup" class="p-0 rounded-2xl shadow-2xl max-w-sm w-full bg-white backdrop:bg-black/60 overflow-hidden">
+    <div class="bg-gradient-to-r from-amber-600 to-amber-800 p-4 text-white">
+      <div class="flex justify-between items-start">
+        <div class="flex items-center space-x-2">
+          <span class="text-xl">📥</span>
+          <div>
+            <h3 class="font-bold text-sm">Restore Database</h3>
+            <p class="text-[11px] text-amber-100">Disaster Recovery from .posbak file</p>
+          </div>
+        </div>
+        <button onclick="closeModal('modalRestoreBackup')" class="text-amber-200 hover:text-white text-lg font-bold">&times;</button>
+      </div>
+    </div>
+
+    <div class="p-4 space-y-3 text-xs text-gray-700">
+      <div class="bg-amber-50 border border-amber-200 rounded-xl p-2.5 text-[11px] text-amber-900">
+        Select a valid <code>.posbak</code> or <code>.json</code> backup file from your phone storage or WhatsApp.
+      </div>
+
+      <div>
+        <label class="block font-bold text-gray-700 mb-1">Select Backup File *</label>
+        <input type="file" id="restoreFileInput" accept=".posbak,.json" class="w-full text-xs text-gray-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+      </div>
+
+      <div>
+        <label class="block font-bold text-gray-700 mb-1">Decryption Password / Owner PIN</label>
+        <input type="password" id="restorePasswordInput" placeholder="Enter Owner PIN used during backup" class="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg text-xs font-mono">
+      </div>
+
+      <div class="grid grid-cols-2 gap-2 pt-2 border-t border-gray-100">
+        <button type="button" onclick="closeModal('modalRestoreBackup')" class="py-2 bg-gray-100 hover:bg-gray-200 font-bold text-xs rounded-xl text-gray-700 transition">
+          Cancel
+        </button>
+        <button type="button" onclick="executeRestoreBackup()" class="py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl shadow-md transition active:scale-95">
+          Restore Data
+        </button>
+      </div>
+    </div>
+  </dialog>
+
   <!-- TOAST NOTIFICATION POPUP -->
   <div id="toastNotification" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 bg-gray-900 text-white px-4 py-3 rounded-lg shadow-xl text-xs flex items-center space-x-2">
     <span id="toastIcon">✅</span>
@@ -1464,6 +1721,7 @@
   <script src="firebase-config.js"></script>
   <script src="firebase-db.js"></script>
   <script src="mobile-db.js"></script>
+  <script src="security.js"></script>
   <script src="scanner.js"></script>
   <script src="app.js"></script>
 </body>

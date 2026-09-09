@@ -77,12 +77,58 @@ public class MainActivity extends BridgeActivity {
             });
         }
 
+        @JavascriptInterface
+        public void saveAndShareBackup(String filename, String content, String caption) {
+            runOnUiThread(() -> {
+                try {
+                    File exportDir = new File(mContext.getCacheDir(), "exports");
+                    if (!exportDir.exists()) {
+                        exportDir.mkdirs();
+                    }
+                    File backupFile = new File(exportDir, filename);
+                    try (FileOutputStream fos = new FileOutputStream(backupFile)) {
+                        fos.write(content.getBytes(StandardCharsets.UTF_8));
+                    }
+
+                    saveToDownloadsFolder(filename, content, "application/octet-stream");
+
+                    Uri contentUri = FileProvider.getUriForFile(
+                        mContext,
+                        mContext.getPackageName() + ".fileprovider",
+                        backupFile
+                    );
+
+                    String shareText = (caption != null && !caption.isEmpty()) ? caption : ("Mobile Decor & Tech Backup: " + filename);
+
+                    Intent intent = new Intent(Intent.ACTION_SEND);
+                    intent.setType("*/*");
+                    intent.putExtra(Intent.EXTRA_SUBJECT, filename);
+                    intent.putExtra(Intent.EXTRA_TEXT, shareText);
+                    intent.putExtra(Intent.EXTRA_STREAM, contentUri);
+                    intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+
+                    Intent chooser = Intent.createChooser(intent, "Send Backup via WhatsApp / Cloud (" + filename + ")");
+                    chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    mContext.startActivity(chooser);
+
+                    Toast.makeText(mContext, "Database Backup saved to Downloads & opened Share options!", Toast.LENGTH_SHORT).show();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    Toast.makeText(mContext, "Backup error: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                }
+            });
+        }
+
         private void saveToDownloadsFolder(String filename, String content) {
+            saveToDownloadsFolder(filename, content, "text/csv");
+        }
+
+        private void saveToDownloadsFolder(String filename, String content, String mimeType) {
             try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     ContentValues values = new ContentValues();
                     values.put(MediaStore.MediaColumns.DISPLAY_NAME, filename);
-                    values.put(MediaStore.MediaColumns.MIME_TYPE, "text/csv");
+                    values.put(MediaStore.MediaColumns.MIME_TYPE, mimeType);
                     values.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS);
 
                     Uri uri = mContext.getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);

@@ -445,6 +445,168 @@ const FirebaseDB = {
     });
   },
 
+  /**
+   * Soft-voids a sales invoice, logs audit trail, and restores stock
+   */
+  async voidOrder(orderId, voidDetails = {}) {
+    const order = this.cache.orders.find(o => String(o.id) === String(orderId) || o.invoice_number === String(orderId));
+    if (!order) throw new Error('Order not found');
+    if (order.status === 'VOID') throw new Error('Invoice is already voided');
+
+    const voidReason = voidDetails.reason || voidDetails.void_reason || 'Cancelled by Store Authority';
+    const nowIso = new Date().toISOString();
+
+    // 1. If Firebase active, update Firestore
+    if (this.db) {
+      const batch = this.db.batch();
+      const orderRef = this.db.collection('orders').doc(order.invoice_number || String(order.id));
+      batch.update(orderRef, {
+        status: 'VOID',
+        voided_at: nowIso,
+        void_reason: voidReason,
+        voided_by: 'Owner'
+      });
+
+      // Restore sold products
+      const items = Array.isArray(order.items) ? order.items : [];
+      for (const it of items) {
+        const isPhone = it.item_type === 'phone' || !!it.imei_number;
+        if (isPhone) {
+          const phoneId = it.imei_number || it.sku_or_imei || it.id;
+          if (phoneId) {
+            const phoneRef = this.db.collection('phones').doc(String(phoneId));
+            batch.update(phoneRef, {
+              status: 'In-Stock',
+              sold_at: null,
+              order_id: null
+            });
+          }
+        } else if (it.id) {
+          const accRef = this.db.collection('items').doc(String(it.id));
+          const currentAcc = this.cache.items.find(a => String(a.id) === String(it.id));
+          const newQty = (currentAcc ? Number(currentAcc.stock_quantity || 0) : 0) + (Number(it.quantity) || 1);
+          batch.update(accRef, { stock_quantity: newQty });
+        }
+      }
+      await batch.commit();
+    }
+
+    // 2. Update local cache
+    order.status = 'VOID';
+    order.voided_at = nowIso;
+    order.void_reason = voidReason;
+    order.voided_by = 'Owner';
+
+    const items = Array.isArray(order.items) ? order.items : [];
+    for (const it of items) {
+      const isPhone = it.item_type === 'phone' || !!it.imei_number;
+      if (isPhone) {
+        const phone = this.cache.phones.find(p => p.imei_number === (it.imei_number || it.sku_or_imei) || String(p.id) === String(it.id));
+        if (phone) {
+          phone.status = 'In-Stock';
+          delete phone.sold_at;
+          delete phone.order_id;
+        }
+      } else {
+        const acc = this.cache.items.find(a => String(a.id) === String(it.id));
+        if (acc) {
+          acc.stock_quantity = (Number(acc.stock_quantity) || 0) + (Number(it.quantity) || 1);
+        }
+      }
+    }
+
+    // Also update MobileDB if available
+    if (window.MobileDB) {
+      try {
+        window.MobileDB.voidOrder(order.id || order.invoice_number, { reason: voidReason });
+      } catch (_) {}
+    }
+
+    // Log security audit event
+    if (window.AuthSecurity) {
+      await window.AuthSecurity.logAudit('INVOICE_VOIDED', {
+        invoice_number: order.invoice_number,
+        total_amount: order.total_amount || order.final_amount,
+        reason: voidReason
+      });
+    }
+
+    return {
+      success: true,
+      message: `Invoice ${order.invoice_number} voided and inventory replenished.`,
+      order
+    };
+  },
+
+  /**
+   * Generates a complete database snapshot for backup
+   */
+  exportFullDatabase() {
+    return {
+      format: 'BIPLOB_SHOP_POS_BACKUP',
+      version: '2.0',
+      timestamp: new Date().toISOString(),
+      counts: {
+        items: this.cache.items.length,
+        phones: this.cache.phones.length,
+        categories: this.cache.categories.length,
+        orders: this.cache.orders.length
+      },
+      items: this.cache.items,
+      phones: this.cache.phones,
+      categories: this.cache.categories,
+      orders: this.cache.orders
+    };
+  },
+
+  /**
+   * Restores full database snapshot from backup file
+   */
+  async restoreFullDatabase(backupData) {
+    if (!backupData || (!backupData.items && !backupData.phones)) {
+      throw new Error('Invalid backup format: missing items or phones data');
+    }
+
+    if (Array.isArray(backupData.items)) this.cache.items = backupData.items;
+    if (Array.isArray(backupData.phones)) this.cache.phones = backupData.phones;
+    if (Array.isArray(backupData.categories)) this.cache.categories = backupData.categories;
+    if (Array.isArray(backupData.orders)) this.cache.orders = backupData.orders;
+
+    if (this.db) {
+      for (const item of (backupData.items || [])) {
+        if (item.id) await this.db.collection('items').doc(String(item.id)).set(item, { merge: true });
+      }
+      for (const phone of (backupData.phones || [])) {
+        const id = phone.imei_number || phone.id;
+        if (id) await this.db.collection('phones').doc(String(id)).set(phone, { merge: true });
+      }
+      for (const order of (backupData.orders || [])) {
+        const id = order.invoice_number || order.id;
+        if (id) await this.db.collection('orders').doc(String(id)).set(order, { merge: true });
+      }
+    }
+
+    if (window.MobileDB) {
+      if (Array.isArray(backupData.items)) window.MobileDB._set(window.MobileDB.KEYS.ITEMS, backupData.items);
+      if (Array.isArray(backupData.phones)) window.MobileDB._set(window.MobileDB.KEYS.PHONES, backupData.phones);
+      if (Array.isArray(backupData.categories)) window.MobileDB._set(window.MobileDB.KEYS.CATEGORIES, backupData.categories);
+      if (Array.isArray(backupData.orders)) window.MobileDB._set(window.MobileDB.KEYS.ORDERS, backupData.orders);
+    }
+
+    if (window.AuthSecurity) {
+      await window.AuthSecurity.logAudit('DATABASE_RESTORED', {
+        restored_items: (backupData.items || []).length,
+        restored_phones: (backupData.phones || []).length,
+        restored_orders: (backupData.orders || []).length
+      });
+    }
+
+    return {
+      success: true,
+      restoredCount: (backupData.items || []).length + (backupData.phones || []).length + (backupData.orders || []).length
+    };
+  },
+
   // --- ACCESSORY OPERATIONS ---
   async addAccessory(data) {
     if (!this.isConfigured()) throw new Error('Firebase not configured');
@@ -1011,6 +1173,12 @@ const FirebaseDB = {
         return this._json(orders);
       }
 
+      const voidMatch = pathname.match(/^\/api\/orders\/([^/]+)\/void$/);
+      if (voidMatch && method === 'POST') {
+        const id = voidMatch[1];
+        return this._json(await this.voidOrder(id, parsedBody));
+      }
+
       const orderMatch = pathname.match(/^\/api\/orders\/([^/]+)$/);
       if (orderMatch && method === 'GET') {
         const id = orderMatch[1];
@@ -1028,7 +1196,7 @@ const FirebaseDB = {
       if (pathname === '/api/reports/summary') {
         const month = query.get('month') || '';
         const year = query.get('year') || '';
-        let filtered = [...this.cache.orders];
+        let filtered = this.cache.orders.filter(o => o.status !== 'VOID');
         if (month && year) {
           filtered = filtered.filter(o => {
             if (!o.created_at) return false;
@@ -1128,7 +1296,7 @@ const FirebaseDB = {
       if (pathname === '/api/reports/export/sales.csv') {
         const month = query.get('month');
         const year = query.get('year');
-        let orders = [...this.cache.orders];
+        let orders = this.cache.orders.filter(o => o.status !== 'VOID');
         if (month && year) {
           orders = orders.filter(o => {
             const d = new Date(o.created_at);
@@ -1147,6 +1315,15 @@ const FirebaseDB = {
             'Content-Disposition': `attachment; filename="sales-report-${Date.now()}.csv"`
           }
         });
+      }
+
+      // 10. Database Backup & Restore API
+      if (pathname === '/api/backup/export' && method === 'GET') {
+        return this._json(this.exportFullDatabase());
+      }
+
+      if (pathname === '/api/backup/restore' && method === 'POST') {
+        return this._json(await this.restoreFullDatabase(parsedBody));
       }
 
       if (pathname === '/api/reports/export/outofstock.csv') {

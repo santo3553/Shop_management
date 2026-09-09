@@ -489,6 +489,87 @@ const MobileDB = {
     return paymentRecord;
   },
 
+  voidOrder(orderId, voidDetails = {}) {
+    const orders = this._get(this.KEYS.ORDERS);
+    const phones = this._get(this.KEYS.PHONES);
+    const items = this._get(this.KEYS.ITEMS);
+
+    const order = orders.find(o => String(o.id) === String(orderId) || o.invoice_number === String(orderId));
+    if (!order) throw new Error('Order not found');
+    if (order.status === 'VOID') throw new Error('Invoice is already voided');
+
+    const voidReason = voidDetails.reason || voidDetails.void_reason || 'Cancelled by Store Authority';
+    const nowIso = new Date().toISOString();
+
+    order.status = 'VOID';
+    order.voided_at = nowIso;
+    order.void_reason = voidReason;
+    order.voided_by = 'Owner';
+
+    // Replenish inventory
+    (order.items || []).forEach(it => {
+      const isPhone = it.item_type === 'phone' || !!it.imei_number;
+      if (isPhone) {
+        const phone = phones.find(p => p.imei_number === (it.imei_number || it.sku_or_imei) || String(p.id) === String(it.id));
+        if (phone) {
+          phone.status = 'In-Stock';
+          delete phone.sold_at;
+          delete phone.order_id;
+        }
+      } else {
+        const acc = items.find(a => String(a.id) === String(it.id));
+        if (acc) {
+          acc.stock_quantity = (Number(acc.stock_quantity) || 0) + (Number(it.quantity) || 1);
+        }
+      }
+    });
+
+    this._set(this.KEYS.ORDERS, orders);
+    this._set(this.KEYS.PHONES, phones);
+    this._set(this.KEYS.ITEMS, items);
+
+    return {
+      success: true,
+      message: `Invoice ${order.invoice_number} voided and inventory replenished.`,
+      order
+    };
+  },
+
+  exportBackup() {
+    return {
+      format: 'BIPLOB_SHOP_POS_BACKUP',
+      version: '2.0',
+      timestamp: new Date().toISOString(),
+      counts: {
+        items: this._get(this.KEYS.ITEMS).length,
+        phones: this._get(this.KEYS.PHONES).length,
+        categories: this._get(this.KEYS.CATEGORIES).length,
+        orders: this._get(this.KEYS.ORDERS).length
+      },
+      items: this._get(this.KEYS.ITEMS),
+      phones: this._get(this.KEYS.PHONES),
+      categories: this._get(this.KEYS.CATEGORIES),
+      orders: this._get(this.KEYS.ORDERS),
+      payments: this._get(this.KEYS.PAYMENTS)
+    };
+  },
+
+  restoreBackup(backupData) {
+    if (!backupData || (!backupData.items && !backupData.phones)) {
+      throw new Error('Invalid backup format: missing items or phones data');
+    }
+    if (Array.isArray(backupData.items)) this._set(this.KEYS.ITEMS, backupData.items);
+    if (Array.isArray(backupData.phones)) this._set(this.KEYS.PHONES, backupData.phones);
+    if (Array.isArray(backupData.categories)) this._set(this.KEYS.CATEGORIES, backupData.categories);
+    if (Array.isArray(backupData.orders)) this._set(this.KEYS.ORDERS, backupData.orders);
+    if (Array.isArray(backupData.payments)) this._set(this.KEYS.PAYMENTS, backupData.payments);
+
+    return {
+      success: true,
+      restoredCount: (backupData.items || []).length + (backupData.phones || []).length + (backupData.orders || []).length
+    };
+  },
+
   getReportsSummary(month, year) {
     const orders = this._get(this.KEYS.ORDERS);
     const phones = this._get(this.KEYS.PHONES);
@@ -499,7 +580,7 @@ const MobileDB = {
     const filterMonth = month ? String(month).padStart(2, '0') : String(now.getMonth() + 1).padStart(2, '0');
     const prefix = `${filterYear}-${filterMonth}`;
 
-    const monthOrders = orders.filter(o => o.created_at && o.created_at.startsWith(prefix));
+    const monthOrders = orders.filter(o => o.status !== 'VOID' && o.created_at && o.created_at.startsWith(prefix));
 
     const totalOrders = monthOrders.length;
     const totalRevenue = monthOrders.reduce((sum, o) => sum + (o.total_amount || 0), 0);
@@ -659,6 +740,12 @@ const MobileDB = {
         }
       }
 
+      const voidMatch = pathname.match(/^\/api\/orders\/([^\/]+)\/void$/);
+      if (voidMatch && method === 'POST') {
+        const id = voidMatch[1];
+        return this._json(this.voidOrder(id, parsedBody));
+      }
+
       const orderMatch = pathname.match(/^\/api\/orders\/([^\/]+)$/);
       if (orderMatch && method === 'GET') {
         const id = orderMatch[1];
@@ -716,7 +803,7 @@ const MobileDB = {
       if (pathname === '/api/reports/export/sales.csv') {
         const month = query.get('month');
         const year = query.get('year');
-        let orders = this.getOrders('', '');
+        let orders = this.getOrders('', '').filter(o => o.status !== 'VOID');
         if (month && year) {
           orders = orders.filter(o => {
             const d = new Date(o.created_at);
@@ -735,6 +822,15 @@ const MobileDB = {
             'Content-Disposition': `attachment; filename="sales-report-${Date.now()}.csv"`
           }
         });
+      }
+
+      // Backup & Restore API
+      if (pathname === '/api/backup/export' && method === 'GET') {
+        return this._json(this.exportBackup());
+      }
+
+      if (pathname === '/api/backup/restore' && method === 'POST') {
+        return this._json(this.restoreBackup(parsedBody));
       }
 
       if (pathname === '/api/reports/export/outofstock.csv') {

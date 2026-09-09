@@ -56,6 +56,15 @@
   color: #ffffff;
 }
 
+/* Role-based access control visibility rules */
+body.role-staff .owner-only-stat {
+  display: none !important;
+}
+
+body.role-staff .owner-only-action {
+  display: none !important;
+}
+
 /* Native dialog styling */
 dialog {
   border: none;

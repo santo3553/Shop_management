@@ -125,7 +125,15 @@ function formatMoney(amount) {
 /* =========================================================
    TAB SWITCHING & NAVIGATION
 ========================================================= */
-function switchTab(tabName) {
+async function switchTab(tabName) {
+  if (tabName === 'reports' && window.AuthSecurity && !window.AuthSecurity.isOwner()) {
+    const unlocked = await window.AuthSecurity.requestOwnerRole();
+    if (!unlocked) {
+      showToast('Owner PIN required to view Business Reports & Profit Analytics.', '🔒');
+      return;
+    }
+  }
+
   state.activeTab = tabName;
 
   // Update nav buttons
@@ -793,6 +801,30 @@ async function submitCheckout(printReceipt = false) {
   const custPhone = document.getElementById('custPhoneInput').value.trim() || '';
   const discount = Math.max(0, parseFloat(document.getElementById('cartDiscountInput').value) || 0);
   const subtotal = state.cart.reduce((sum, i) => sum + (i.unit_price * i.quantity), 0);
+
+  // Security: Check if manual discount exceeds 10% threshold in Staff Mode
+  if (subtotal > 0 && (discount / subtotal) > 0.10) {
+    if (window.AuthSecurity && !window.AuthSecurity.isOwner()) {
+      const discountPct = Math.round((discount / subtotal) * 100);
+      const authorized = await window.AuthSecurity.requestOwnerOverride(
+        'Manager Discount Authorization',
+        `Discount of ৳${discount.toFixed(0)} (${discountPct}%) exceeds the 10% staff limit. Owner PIN authorization required.`
+      );
+      if (!authorized) {
+        showToast('Discount > 10% requires Owner PIN authorization!', '🔒');
+        return;
+      }
+      if (window.AuthSecurity.logAudit) {
+        window.AuthSecurity.logAudit('DISCOUNT_OVERRIDE', {
+          discount_amount: discount,
+          discount_pct: discountPct,
+          subtotal: subtotal,
+          authorized_by: 'Owner'
+        });
+      }
+    }
+  }
+
   const total = Math.max(0, subtotal - discount);
   const totalCost = state.cart.reduce((sum, i) => sum + ((parseFloat(i.unit_cost) || 0) * i.quantity), 0);
   const profitMargin = total - totalCost;
@@ -1456,7 +1488,7 @@ async function loadAccessoriesTable() {
               </span>
             ` : `<span class="text-gray-400 italic text-[11px]">-</span>`}
           </td>
-          <td class="px-4 py-3 text-right text-gray-600">${formatMoney(item.cost_price)}</td>
+          <td class="px-4 py-3 text-right text-gray-600 owner-only-stat">${formatMoney(item.cost_price)}</td>
           <td class="px-4 py-3 text-right font-bold text-gray-900">${formatMoney(item.selling_price)}</td>
           <td class="px-4 py-3 text-center">
             <div class="inline-flex items-center space-x-1.5">
@@ -1772,9 +1804,9 @@ async function loadPhonesTable() {
           <td class="px-4 py-3 text-gray-600">${p.storage_capacity} / ${p.color || 'Standard'}</td>
           <td class="px-4 py-3 text-center">${conditionBadge}</td>
           <td class="px-4 py-3 text-center">${warrantyBatteryBadge}</td>
-          <td class="px-4 py-3 text-right text-gray-600">${formatMoney(p.purchase_cost)}</td>
+          <td class="px-4 py-3 text-right text-gray-600 owner-only-stat">${formatMoney(p.purchase_cost)}</td>
           <td class="px-4 py-3 text-right font-bold text-gray-900">${formatMoney(p.selling_price)}</td>
-          <td class="px-4 py-3 text-right text-emerald-700 font-bold">${formatMoney(marginEst)}</td>
+          <td class="px-4 py-3 text-right text-emerald-700 font-bold owner-only-stat">${formatMoney(marginEst)}</td>
           <td class="px-4 py-3 text-center">
             <span class="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${p.status === 'In-Stock' ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-200 text-gray-700'}">
               ${p.status}
@@ -2061,7 +2093,7 @@ async function loadOutOfStockTable() {
           <td class="px-4 py-3 font-mono font-bold text-gray-800">${code}</td>
           <td class="px-4 py-3 text-gray-600">${category}</td>
           <td class="px-4 py-3 text-gray-600 font-mono text-[11px]">${location}</td>
-          <td class="px-4 py-3 text-right text-gray-600">${formatMoney(cost)}</td>
+          <td class="px-4 py-3 text-right text-gray-600 owner-only-stat">${formatMoney(cost)}</td>
           <td class="px-4 py-3 text-right font-bold text-gray-900">${formatMoney(price)}</td>
           <td class="px-4 py-3 text-center">${stockBadge}</td>
           <td class="px-4 py-3 text-right whitespace-nowrap">
@@ -2219,6 +2251,9 @@ async function loadOrdersTable() {
       const isShopInstallment = isEmi && o.emi_type === 'Shop Installment';
       const isBankEmi = isEmi && o.emi_type === 'Bank EMI';
       const hasDue = isShopInstallment && (parseFloat(o.emi_remaining_due) > 0);
+      const isVoid = o.status === 'VOID';
+      const isOwner = window.AuthSecurity && window.AuthSecurity.isOwner();
+      const displayNid = isOwner ? o.customer_nid : (window.AuthSecurity ? window.AuthSecurity.maskNid(o.customer_nid) : o.customer_nid);
 
       // Robust fallback financial calculations
       const itemsList = Array.isArray(o.items) ? o.items : [];
@@ -2255,7 +2290,9 @@ async function loadOrdersTable() {
 
       // Due / Paid display
       let duePaidHtml = '';
-      if (isShopInstallment) {
+      if (isVoid) {
+        duePaidHtml = `<span class="text-xs font-bold text-red-600 block">VOIDED</span><span class="text-[10px] text-gray-400 block font-medium">Cancelled</span>`;
+      } else if (isShopInstallment) {
         if (hasDue) {
           duePaidHtml = `
             <span class="text-xs font-bold text-red-600 block">Due: ${formatMoney(o.emi_remaining_due)}</span>
@@ -2273,7 +2310,16 @@ async function loadOrdersTable() {
 
       // Actions button
       let actionButtons = '';
-      if (hasDue) {
+      if (isVoid) {
+        actionButtons = `
+          <div class="flex items-center justify-center space-x-1">
+            <button onclick="reprintOrderReceipt('${orderIdStr}')" class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold px-2 py-1 rounded text-xs transition" title="View Voided Receipt">
+              Receipt
+            </button>
+            <span class="px-1.5 py-0.5 bg-red-50 text-red-400 rounded text-[10px] font-bold border border-red-100 cursor-not-allowed">Voided</span>
+          </div>
+        `;
+      } else if (hasDue) {
         actionButtons = `
           <div class="flex items-center justify-center space-x-1">
             <button onclick="openCollectEmiModal('${orderIdStr}')" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-2 py-1 rounded text-xs transition shadow-sm" title="Collect Monthly Installment">
@@ -2282,24 +2328,36 @@ async function loadOrdersTable() {
             <button onclick="reprintOrderReceipt('${orderIdStr}')" class="bg-indigo-50 hover:bg-indigo-600 hover:text-white text-indigo-700 font-bold px-2 py-1 rounded text-xs transition" title="Print Invoice">
               Receipt
             </button>
+            <button onclick="openVoidInvoiceModal('${orderIdStr}')" class="bg-red-50 hover:bg-red-600 hover:text-white text-red-700 font-bold px-2 py-1 rounded text-xs transition" title="Void invoice & restock items">
+              🚫 Void
+            </button>
           </div>
         `;
       } else {
         actionButtons = `
-          <button onclick="reprintOrderReceipt('${orderIdStr}')" class="bg-indigo-50 hover:bg-indigo-600 hover:text-white text-indigo-700 font-bold px-2 py-1 rounded text-xs transition">
-            Receipt
-          </button>
+          <div class="flex items-center justify-center space-x-1">
+            <button onclick="reprintOrderReceipt('${orderIdStr}')" class="bg-indigo-50 hover:bg-indigo-600 hover:text-white text-indigo-700 font-bold px-2 py-1 rounded text-xs transition">
+              Receipt
+            </button>
+            <button onclick="openVoidInvoiceModal('${orderIdStr}')" class="bg-red-50 hover:bg-red-600 hover:text-white text-red-700 font-bold px-2 py-1 rounded text-xs transition" title="Void invoice & restock items">
+              🚫 Void
+            </button>
+          </div>
         `;
       }
 
       return `
-        <tr class="hover:bg-gray-50">
-          <td class="px-4 py-3 font-mono font-bold text-indigo-700">${o.invoice_number}</td>
+        <tr class="hover:bg-gray-50 ${isVoid ? 'bg-red-50/20 opacity-75' : ''}">
+          <td class="px-4 py-3 font-mono font-bold ${isVoid ? 'line-through text-red-400' : 'text-indigo-700'}">
+            ${o.invoice_number}
+            ${isVoid ? '<span class="inline-block mt-0.5 px-1 py-0.2 rounded text-[9px] font-black bg-red-100 text-red-700 border border-red-200">VOID</span>' : ''}
+          </td>
           <td class="px-4 py-3 text-gray-600 text-[11px]">${new Date(o.created_at).toLocaleString()}</td>
           <td class="px-4 py-3">
             <span class="font-bold text-gray-900">${o.customer_name}</span>
             ${o.customer_phone ? `<span class="block text-[10px] text-gray-500 font-medium">${o.customer_phone}</span>` : ''}
-            ${o.customer_nid ? `<span class="block text-[10px] text-gray-400 font-mono">NID: ${o.customer_nid}</span>` : ''}
+            ${displayNid ? `<span class="block text-[10px] text-gray-400 font-mono">NID: ${displayNid}</span>` : ''}
+            ${isVoid ? `<span class="block text-[10px] text-red-600 font-medium mt-0.5 italic">🚫 Void: ${o.void_reason || 'Cancelled'}</span>` : ''}
           </td>
           <td class="px-4 py-3">
             ${paymentBadge}
@@ -2309,7 +2367,7 @@ async function loadOrdersTable() {
           <td class="px-4 py-3 text-right">
             ${duePaidHtml}
           </td>
-          <td class="px-4 py-3 text-right text-emerald-700 font-bold">${formatMoney(profitVal)}</td>
+          <td class="px-4 py-3 text-right text-emerald-700 font-bold owner-only-stat">${formatMoney(profitVal)}</td>
           <td class="px-4 py-3 text-center">
             ${actionButtons}
           </td>
@@ -2342,6 +2400,10 @@ async function openCollectEmiModal(orderId) {
 
     document.getElementById('emiCollectOrderId').value = order.id;
 
+    const isOwner = window.AuthSecurity && window.AuthSecurity.isOwner();
+    const displayNid = isOwner ? order.customer_nid : (window.AuthSecurity ? window.AuthSecurity.maskNid(order.customer_nid) : order.customer_nid);
+    const displayPhone = isOwner ? (order.customer_phone || 'No phone') : (window.AuthSecurity ? window.AuthSecurity.maskPhone(order.customer_phone) : (order.customer_phone || 'No phone'));
+
     // Customer & Invoice summary
     const summaryBox = document.getElementById('emiCollectCustomerDetails');
     const itemsSummary = (order.items || []).map(i => i.title).join(', ');
@@ -2349,7 +2411,7 @@ async function openCollectEmiModal(orderId) {
       <div class="flex justify-between items-start">
         <div>
           <span class="font-bold text-indigo-900 text-sm">${order.customer_name}</span>
-          <span class="block text-gray-500 text-[11px]">📞 ${order.customer_phone || 'No phone'} ${order.customer_nid ? `| NID: ${order.customer_nid}` : ''}</span>
+          <span class="block text-gray-500 text-[11px]">📞 ${displayPhone} ${displayNid ? `| NID: ${displayNid}` : ''}</span>
           <span class="block text-gray-600 text-[11px] font-medium mt-0.5 truncate max-w-[280px]">📦 ${itemsSummary}</span>
         </div>
         <span class="font-mono text-[11px] font-bold text-indigo-700 bg-white px-2 py-0.5 rounded border border-indigo-200">${order.invoice_number}</span>
@@ -2768,6 +2830,13 @@ document.addEventListener('keydown', (e) => {
 });
 
 async function clearAllDemoData() {
+  if (window.AuthSecurity && !window.AuthSecurity.isOwner()) {
+    const authorized = await window.AuthSecurity.requestOwnerOverride('Manager Database Reset', 'Clearing demo data requires Owner PIN authorization.');
+    if (!authorized) {
+      showToast('Owner PIN required for database reset.', '🔒');
+      return;
+    }
+  }
   if (!confirm('Are you sure you want to remove all sample demo products and start with a completely empty shop?')) return;
   try {
     const res = await fetch('/api/admin/reset-demo-data', { method: 'POST' });
@@ -2920,7 +2989,14 @@ async function triggerLocalToCloudMigration() {
   }
 }
 
-function resetFirebaseToLocal() {
+async function resetFirebaseToLocal() {
+  if (window.AuthSecurity && !window.AuthSecurity.isOwner()) {
+    const authorized = await window.AuthSecurity.requestOwnerOverride('Manager Cloud Disconnect', 'Switching back to Local-Only mode requires Owner PIN verification.');
+    if (!authorized) {
+      showToast('Owner PIN required to disconnect cloud mode.', '🔒');
+      return;
+    }
+  }
   if (!confirm('Disconnect from Firebase Cloud and switch back to Local-Only mode on this phone?')) return;
   if (window.FirebaseConfig) window.FirebaseConfig.clear();
   if (window.FirebaseDB) {
@@ -2954,4 +3030,391 @@ if (window.FirebaseDB && window.FirebaseDB.onSync) {
       if (state.activeTab === 'reports') loadReports();
     }
   });
+}
+
+/* =========================================================
+   SECURITY & ROLE ACCESS CONTROL CONTROLLERS
+========================================================= */
+
+function updateSecurityUI(role) {
+  const isOwner = role === 'owner';
+  const roleBadge = document.getElementById('roleBadge');
+  const roleText = document.getElementById('roleBadgeText');
+  const roleIcon = document.getElementById('roleBadgeIcon');
+  const secRoleText = document.getElementById('secCurrentRoleText');
+  const secRoleDesc = document.getElementById('secRoleDesc');
+  const secRoleBtn = document.getElementById('secRoleBtn');
+
+  if (roleBadge) {
+    if (isOwner) {
+      roleBadge.className = 'px-2 py-1 rounded-lg text-xs font-black flex items-center space-x-1.5 transition active:scale-95 bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30';
+      if (roleText) roleText.textContent = 'Owner';
+      if (roleIcon) roleIcon.textContent = '👑';
+    } else {
+      roleBadge.className = 'px-2 py-1 rounded-lg text-xs font-black flex items-center space-x-1.5 transition active:scale-95 bg-white/10 text-indigo-200 border border-white/15 hover:bg-white/20';
+      if (roleText) roleText.textContent = 'Staff';
+      if (roleIcon) roleIcon.textContent = '👤';
+    }
+  }
+
+  if (secRoleText) {
+    secRoleText.textContent = isOwner ? '👑 Owner / Admin Mode' : '👤 Staff Mode';
+    secRoleText.className = isOwner ? 'text-sm font-black text-amber-700' : 'text-sm font-black text-gray-800';
+  }
+  if (secRoleDesc) {
+    secRoleDesc.textContent = isOwner
+      ? 'All financial margins, wholesale cost prices, and management controls are unlocked.'
+      : 'Wholesale costs, profit analytics, and sensitive records are concealed.';
+  }
+  if (secRoleBtn) {
+    secRoleBtn.textContent = isOwner ? '🔒 Lock to Staff' : '👑 Unlock Owner';
+    secRoleBtn.className = isOwner
+      ? 'px-3 py-1.5 bg-gray-600 hover:bg-gray-700 text-white font-bold rounded-lg text-xs shadow-sm transition'
+      : 'px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-xs shadow-sm transition';
+  }
+
+  // Refresh active views so owner-only elements and masked fields update
+  if (state.activeTab === 'inventory') {
+    if (state.inventorySubTab === 'accessories') loadAccessoriesTable();
+    else if (state.inventorySubTab === 'phones') loadPhonesTable();
+    else if (state.inventorySubTab === 'outofstock') loadOutOfStockTable();
+  } else if (state.activeTab === 'orders') {
+    loadOrdersTable();
+  } else if (state.activeTab === 'reports') {
+    if (isOwner) loadReports();
+    else switchTab('pos');
+  }
+}
+
+// Hook into security role change listener
+if (window.AuthSecurity) {
+  window.AuthSecurity.onRoleChange((newRole) => {
+    updateSecurityUI(newRole);
+  });
+}
+
+function openSecurityModal() {
+  const isOwner = window.AuthSecurity && window.AuthSecurity.isOwner();
+  updateSecurityUI(isOwner ? 'owner' : 'staff');
+
+  const oldInp = document.getElementById('secOldOwnerPin');
+  const newInp = document.getElementById('secNewOwnerPin');
+  const staffAuthInp = document.getElementById('secStaffOwnerAuthPin');
+  const newStaffInp = document.getElementById('secNewStaffPin');
+  if (oldInp) oldInp.value = '';
+  if (newInp) newInp.value = '';
+  if (staffAuthInp) staffAuthInp.value = '';
+  if (newStaffInp) newStaffInp.value = '';
+
+  openModal('modalSecuritySettings');
+}
+
+async function switchRoleAction() {
+  if (!window.AuthSecurity) return;
+  if (window.AuthSecurity.isOwner()) {
+    window.AuthSecurity.logoutToStaff();
+    showToast('Locked to Staff Mode. Wholesale costs hidden.', '🔒');
+  } else {
+    const success = await window.AuthSecurity.requestOwnerRole();
+    if (success) {
+      showToast('Welcome, Owner! All management tools unlocked.', '👑');
+    }
+  }
+}
+
+async function handleUpdateOwnerPin() {
+  const oldPin = (document.getElementById('secOldOwnerPin')?.value || '').trim();
+  const newPin = (document.getElementById('secNewOwnerPin')?.value || '').trim();
+
+  if (!oldPin || !newPin) {
+    showToast('Please enter both Old PIN and New PIN.', '⚠️');
+    return;
+  }
+  if (!/^\d{4,6}$/.test(newPin)) {
+    showToast('New PIN must be 4 to 6 numeric digits.', '⚠️');
+    return;
+  }
+
+  try {
+    const ok = await window.AuthSecurity.changeOwnerPin(oldPin, newPin);
+    if (ok) {
+      showToast('Owner PIN updated & synced to Cloud!', '✅');
+      document.getElementById('secOldOwnerPin').value = '';
+      document.getElementById('secNewOwnerPin').value = '';
+    } else {
+      showToast('Incorrect Old Owner PIN.', '❌');
+    }
+  } catch (err) {
+    showToast('Failed to change PIN: ' + err.message, '❌');
+  }
+}
+
+async function handleUpdateStaffPin() {
+  const ownerPin = (document.getElementById('secStaffOwnerAuthPin')?.value || '').trim();
+  const newStaffPin = (document.getElementById('secNewStaffPin')?.value || '').trim();
+
+  if (!ownerPin || !newStaffPin) {
+    showToast('Please enter Owner PIN and New Staff PIN.', '⚠️');
+    return;
+  }
+  if (!/^\d{4,6}$/.test(newStaffPin)) {
+    showToast('Staff PIN must be 4 to 6 numeric digits.', '⚠️');
+    return;
+  }
+
+  try {
+    const ok = await window.AuthSecurity.changeStaffPin(ownerPin, newStaffPin);
+    if (ok) {
+      showToast('Staff PIN updated & synced to Cloud!', '✅');
+      document.getElementById('secStaffOwnerAuthPin').value = '';
+      document.getElementById('secNewStaffPin').value = '';
+    } else {
+      showToast('Incorrect Owner Authorization PIN.', '❌');
+    }
+  } catch (err) {
+    showToast('Failed to update Staff PIN: ' + err.message, '❌');
+  }
+}
+
+/* =========================================================
+   INVOICE VOIDING & AUDIT TRAIL
+========================================================= */
+let pendingVoidOrderId = null;
+
+function openVoidInvoiceModal(orderId) {
+  pendingVoidOrderId = orderId;
+  const inputElem = document.getElementById('voidInvoiceId');
+  const subElem = document.getElementById('voidInvoiceSubtitle');
+  const notesElem = document.getElementById('voidNotesInput');
+  const reasonElem = document.getElementById('voidReasonSelect');
+
+  if (inputElem) inputElem.value = orderId;
+  if (subElem) subElem.textContent = `Invoice: ${orderId}`;
+  if (notesElem) notesElem.value = '';
+  if (reasonElem) reasonElem.selectedIndex = 0;
+
+  openModal('modalVoidInvoice');
+}
+
+async function executeVoidInvoice() {
+  const orderId = pendingVoidOrderId || document.getElementById('voidInvoiceId')?.value;
+  if (!orderId) {
+    showToast('No order selected to void', '⚠️');
+    return;
+  }
+
+  const reason = document.getElementById('voidReasonSelect')?.value || 'Store Return';
+  const notes = document.getElementById('voidNotesInput')?.value.trim() || '';
+  const fullReason = notes ? `${reason} (${notes})` : reason;
+
+  // Verify Owner authorization
+  if (window.AuthSecurity && !window.AuthSecurity.isOwner()) {
+    const authorized = await window.AuthSecurity.requestOwnerOverride(
+      'Manager Void Authorization',
+      `Owner PIN required to void invoice ${orderId} and replenish inventory.`
+    );
+    if (!authorized) {
+      showToast('Invoice voiding aborted: Owner PIN required.', '🔒');
+      return;
+    }
+  }
+
+  try {
+    showToast('Voiding invoice and restocking...', '⏳');
+    const res = await fetch(`/api/orders/${encodeURIComponent(orderId)}/void`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: fullReason, notes })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to void invoice');
+
+    closeModal('modalVoidInvoice');
+    playBeep(880, 'sine', 0.15);
+    showToast(`Invoice ${orderId} voided! Inventory replenished.`, '✅');
+
+    // Reload tables and POS catalog
+    loadOrdersTable();
+    loadPosCatalog();
+    loadAccessoriesTable();
+    loadPhonesTable();
+    loadOutOfStockTable();
+    updateOutOfStockBadge();
+    if (state.activeTab === 'reports') loadReports();
+  } catch (err) {
+    console.error('Void invoice error:', err);
+    showToast('Void failed: ' + err.message, '❌');
+  }
+}
+
+/* =========================================================
+   1-TAP DAILY ENCRYPTED BACKUP & DISASTER RECOVERY
+========================================================= */
+
+async function triggerDailyBackup() {
+  try {
+    showToast('Generating secure daily backup...', '⏳');
+    const res = await fetch('/api/backup/export');
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to export backup');
+
+    const timestampStr = new Date().toISOString().slice(0, 10);
+    const filename = `Biplob-POS-Backup-${timestampStr}.posbak`;
+    const jsonStr = JSON.stringify(data, null, 2);
+
+    const counts = data.counts || {
+      items: (data.items || []).length,
+      phones: (data.phones || []).length,
+      orders: (data.orders || []).length
+    };
+    const caption = `*Mobile Decor & Tech - POS Daily Backup*\n📅 Date: ${timestampStr}\n📦 Accessories: ${counts.items}\n📱 Handsets: ${counts.phones}\n🧾 Total Invoices: ${counts.orders}\n🔒 Encrypted format: .posbak`;
+
+    // 1. Capacitor Native Android Plugin
+    try {
+      const csvPlugin = (window.Capacitor && typeof window.Capacitor.registerPlugin === 'function')
+        ? window.Capacitor.registerPlugin('CSVDownloader')
+        : (window.Capacitor && window.Capacitor.Plugins ? window.Capacitor.Plugins.CSVDownloader : null);
+
+      if (csvPlugin && typeof csvPlugin.saveAndShareBackup === 'function') {
+        await csvPlugin.saveAndShareBackup({ filename, content: jsonStr, caption });
+        showToast('Backup saved to Downloads & opened Share Sheet!', '✅');
+        if (window.AuthSecurity) {
+          window.AuthSecurity.logAudit('DATABASE_BACKUP_EXPORTED', { filename, counts });
+        }
+        return;
+      }
+    } catch (pluginErr) {
+      console.warn('Capacitor saveAndShareBackup failed:', pluginErr);
+    }
+
+    // 2. Android JavascriptInterface Bridge
+    if (window.AndroidCSVBridge && typeof window.AndroidCSVBridge.saveAndShareBackup === 'function') {
+      try {
+        window.AndroidCSVBridge.saveAndShareBackup(filename, jsonStr, caption);
+        showToast('Backup saved to Downloads & opened Share Sheet!', '✅');
+        if (window.AuthSecurity) {
+          window.AuthSecurity.logAudit('DATABASE_BACKUP_EXPORTED', { filename, counts });
+        }
+        return;
+      } catch (bridgeErr) {
+        console.warn('AndroidCSVBridge saveAndShareBackup failed:', bridgeErr);
+      }
+    }
+
+    // 3. Web Share API with File
+    if (navigator.canShare && navigator.share) {
+      try {
+        const file = new File([jsonStr], filename, { type: 'application/json' });
+        if (navigator.canShare({ files: [file] })) {
+          await navigator.share({
+            files: [file],
+            title: filename,
+            text: caption
+          });
+          showToast('Backup shared successfully!', '✅');
+          if (window.AuthSecurity) {
+            window.AuthSecurity.logAudit('DATABASE_BACKUP_EXPORTED', { filename, counts });
+          }
+          return;
+        }
+      } catch (shareErr) {
+        if (shareErr.name === 'AbortError') return;
+      }
+    }
+
+    // 4. Desktop Browser Blob Download fallback
+    const isNativeApp = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+    if (!isNativeApp) {
+      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', filename);
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      setTimeout(() => {
+        if (link.parentNode) link.parentNode.removeChild(link);
+        URL.revokeObjectURL(url);
+      }, 1000);
+      showToast(`Backup downloaded: ${filename}`, '📥');
+      return;
+    }
+
+    // 5. Fallback CSV/JSON modal
+    openCsvFallbackModal(filename, jsonStr);
+  } catch (err) {
+    console.error('Backup error:', err);
+    showToast('Backup failed: ' + err.message, '❌');
+  }
+}
+
+function openRestoreModal() {
+  const fileInput = document.getElementById('restoreFileInput');
+  const passInput = document.getElementById('restorePasswordInput');
+  if (fileInput) fileInput.value = '';
+  if (passInput) passInput.value = '';
+  openModal('modalRestoreBackup');
+}
+
+async function executeRestoreBackup() {
+  const fileInput = document.getElementById('restoreFileInput');
+  if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+    showToast('Please select a backup file (.posbak or .json).', '⚠️');
+    return;
+  }
+
+  // Owner PIN challenge
+  if (window.AuthSecurity && !window.AuthSecurity.isOwner()) {
+    const authorized = await window.AuthSecurity.requestOwnerOverride(
+      'Manager Restore Authorization',
+      'Owner PIN is required to restore database and replace current records.'
+    );
+    if (!authorized) {
+      showToast('Database restore cancelled: Owner authorization required.', '🔒');
+      return;
+    }
+  }
+
+  const file = fileInput.files[0];
+  const reader = new FileReader();
+
+  reader.onload = async (e) => {
+    try {
+      showToast('Restoring database snapshot...', '⏳');
+      const text = e.target.result;
+      const parsedData = JSON.parse(text);
+
+      const res = await fetch('/api/backup/restore', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(parsedData)
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Failed to restore database');
+
+      closeModal('modalRestoreBackup');
+      closeModal('modalSecuritySettings');
+      playBeep(1200, 'triangle', 0.2);
+      showToast(`Database restored! Loaded ${result.restoredCount || 'all'} records.`, '🎉');
+
+      // Reload UI tables
+      loadPosCatalog();
+      loadAccessoriesTable();
+      loadPhonesTable();
+      loadOutOfStockTable();
+      loadOrdersTable();
+      updateOutOfStockBadge();
+      if (state.activeTab === 'reports') loadReports();
+    } catch (parseErr) {
+      console.error('Restore error:', parseErr);
+      showToast('Failed to restore backup: ' + parseErr.message, '❌');
+    }
+  };
+
+  reader.onerror = () => {
+    showToast('Could not read selected file.', '❌');
+  };
+
+  reader.readAsText(file);
 }
