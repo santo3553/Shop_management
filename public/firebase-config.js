@@ -15,7 +15,8 @@ const DEFAULT_FIREBASE_CONFIG = {
   storageBucket: "mobile-decor-and-tech.firebasestorage.app",
   messagingSenderId: "169839397452",
   appId: "1:169839397452:web:b558969bb7818dd40682e9",
-  measurementId: "G-2K4Z96QXHJ"
+  measurementId: "G-2K4Z96QXHJ",
+  databaseId: "default"
 };
 
 const FirebaseConfig = {

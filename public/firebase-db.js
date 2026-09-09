@@ -58,6 +58,12 @@ const FirebaseDB = {
 
       this.db = firebase.firestore();
 
+      // Connect to project's custom database (e.g. 'default' instead of '(default)')
+      const targetDb = config.databaseId || 'default';
+      if (this.db && this.db._delegate && this.db._delegate._databaseId) {
+        this.db._delegate._databaseId.database = targetDb;
+      }
+
       // Enable multi-tab IndexedDB offline persistence
       try {
         await this.db.enablePersistence({ synchronizeTabs: true });

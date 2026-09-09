@@ -383,7 +383,7 @@ function renderPosCatalog() {
 
     return `
       <div
-        onclick="handleCatalogItemClick(${item.id}, '${item.type}')"
+        onclick="handleCatalogItemClick('${item.id}', '${item.type}')"
         class="bg-white border rounded-lg p-3 cursor-pointer hover:border-indigo-500 hover:shadow transition relative flex flex-col justify-between ${isOutOfStock ? 'opacity-50 pointer-events-none bg-gray-50' : 'border-gray-200'}"
       >
         <div>
@@ -408,7 +408,7 @@ function renderPosCatalog() {
         </div>
         <div class="mt-2.5 pt-2 border-t border-gray-100 flex items-center justify-between">
           <span class="font-extrabold text-indigo-700 text-sm">${formatMoney(item.selling_price)}</span>
-          <button class="bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white text-xs font-bold px-2 py-1 rounded transition flex items-center space-x-1">
+          <button type="button" onclick="event.stopPropagation(); handleCatalogItemClick('${item.id}', '${item.type}')" class="bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white text-xs font-bold px-2 py-1 rounded transition flex items-center space-x-1 cursor-pointer">
             <span>+ Add</span>
           </button>
         </div>
@@ -418,9 +418,12 @@ function renderPosCatalog() {
 }
 
 function handleCatalogItemClick(id, type) {
-  const item = state.posCatalog.find(i => i.id === id && i.type === type);
+  const item = state.posCatalog.find(i => String(i.id) === String(id) && (type ? i.type === type : true)) ||
+               state.posCatalog.find(i => String(i.id) === String(id) || String(i.code) === String(id));
   if (item) {
     addToCart(item);
+  } else {
+    console.warn('Item not found in posCatalog for id:', id, 'type:', type, state.posCatalog);
   }
 }
 
@@ -480,7 +483,7 @@ function addToCart(product) {
 
   if (product.type === 'phone') {
     // Check if handset already in cart
-    const exists = state.cart.find(c => c.type === 'phone' && c.id === product.id);
+    const exists = state.cart.find(c => c.type === 'phone' && String(c.id) === String(product.id));
     if (exists) {
       showToast('This serialized handset (IMEI) is already in the cart.', '⚠️');
       return;
@@ -504,7 +507,7 @@ function addToCart(product) {
     showToast(`Added handset ${product.title}`);
   } else {
     // Accessory item
-    const existingIndex = state.cart.findIndex(c => c.type === 'accessory' && c.id === product.id);
+    const existingIndex = state.cart.findIndex(c => c.type === 'accessory' && String(c.id) === String(product.id));
 
     if (existingIndex > -1) {
       const current = state.cart[existingIndex];
