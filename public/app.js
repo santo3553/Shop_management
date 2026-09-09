@@ -2076,20 +2076,8 @@ async function exportOutOfStockCsv() {
       csv += row + '\r\n';
     }
 
-    // Trigger download via Blob (offline-compatible on desktop & mobile)
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const filename = `outofstock-products-${new Date().toISOString().slice(0, 10)}.csv`;
-
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', filename);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-
-    showToast(`✅ Exported ${items.length} out-of-stock items to CSV!`, '📥');
+    await downloadOrShareCsv(filename, csv);
   } catch (err) {
     console.error('Export CSV failed:', err);
     showToast('Failed to export CSV: ' + err.message, '❌');
@@ -2415,16 +2403,230 @@ async function loadReports() {
   }
 }
 
-function exportSalesCsv() {
-  const month = document.getElementById('reportMonthSelect')?.value;
-  const year = document.getElementById('reportYearSelect')?.value;
-  let url = '/api/reports/export/sales.csv';
-  if (month && year) url += `?month=${month}&year=${year}`;
-  window.location.href = url;
+/* =========================================================
+   UNIVERSAL CSV EXPORT & DOWNLOAD PIPELINE
+   Works across Native Android (Downloads & Share), Mobile Web & Desktop
+========================================================= */
+let currentExportCsvContent = '';
+let currentExportCsvFilename = '';
+
+async function downloadOrShareCsv(filename, csvContent) {
+  const fullContent = csvContent.startsWith('\uFEFF') ? csvContent : ('\uFEFF' + csvContent);
+
+  // 1. Native Android App Bridge (Saves to device Downloads and opens native Android Share sheet)
+  if (window.AndroidCSVBridge && typeof window.AndroidCSVBridge.saveAndShareCsv === 'function') {
+    try {
+      window.AndroidCSVBridge.saveAndShareCsv(filename, fullContent);
+      showToast('CSV saved to Downloads & opened Share options!', '✅');
+      return;
+    } catch (bridgeErr) {
+      console.warn('Native AndroidCSVBridge failed, falling back to Web Share / Blob:', bridgeErr);
+    }
+  }
+
+  // 2. Modern Web Share API with files (Android Chrome, Mobile Edge, Safari)
+  if (navigator.canShare && navigator.share) {
+    try {
+      const file = new File([fullContent], filename, { type: 'text/csv;charset=utf-8;' });
+      if (navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: filename,
+          text: `Mobile Decor & Tech - ${filename}`
+        });
+        showToast('CSV shared successfully!', '✅');
+        return;
+      }
+    } catch (shareErr) {
+      if (shareErr.name === 'AbortError') return; // user closed dialog
+      console.warn('navigator.share failed, trying blob download:', shareErr);
+    }
+  }
+
+  // 3. Browser Blob Download (<a download="filename" href="blob:...">)
+  try {
+    const blob = new Blob([fullContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename);
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    setTimeout(() => {
+      if (link.parentNode) link.parentNode.removeChild(link);
+      URL.revokeObjectURL(url);
+    }, 1000);
+    showToast(`CSV downloaded: ${filename}`, '📥');
+    return;
+  } catch (blobErr) {
+    console.warn('Blob download failed:', blobErr);
+  }
+
+  // 4. Data URI Download
+  try {
+    const uri = 'data:text/csv;charset=utf-8,' + encodeURIComponent(fullContent);
+    const link = document.createElement('a');
+    link.href = uri;
+    link.setAttribute('download', filename);
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    setTimeout(() => {
+      if (link.parentNode) link.parentNode.removeChild(link);
+    }, 1000);
+    showToast(`CSV downloaded: ${filename}`, '📥');
+    return;
+  } catch (uriErr) {
+    console.warn('Data URI download failed:', uriErr);
+  }
+
+  // 5. Fallback Modal: User can view, copy to clipboard, or share via WhatsApp
+  openCsvFallbackModal(filename, fullContent);
 }
 
-function exportInventoryCsv() {
-  window.location.href = '/api/reports/export/inventory.csv';
+function openCsvFallbackModal(filename, content) {
+  currentExportCsvFilename = filename;
+  currentExportCsvContent = content;
+  const fnElem = document.getElementById('csvFallbackFilename');
+  const taElem = document.getElementById('csvFallbackText');
+  if (fnElem) fnElem.textContent = filename;
+  if (taElem) taElem.value = content;
+  openModal('modalCsvExport');
+}
+
+function copyCsvToClipboard() {
+  if (!currentExportCsvContent) return;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(currentExportCsvContent).then(() => {
+      showToast('CSV copied to clipboard! Paste directly into Excel or Google Sheets.', '📋');
+    }).catch(() => fallbackExecCopy());
+  } else {
+    fallbackExecCopy();
+  }
+}
+
+function fallbackExecCopy() {
+  const ta = document.getElementById('csvFallbackText');
+  if (ta) {
+    ta.select();
+    document.execCommand('copy');
+    showToast('CSV copied to clipboard!', '📋');
+  }
+}
+
+function shareCsvToWhatsApp() {
+  if (!currentExportCsvContent) return;
+  const preview = currentExportCsvContent.length > 2500 ? currentExportCsvContent.slice(0, 2500) + '\n...[truncated]' : currentExportCsvContent;
+  const encoded = encodeURIComponent(`*Mobile Decor & Tech - ${currentExportCsvFilename}*\n\n` + preview);
+  window.open(`https://api.whatsapp.com/send?text=${encoded}`, '_blank');
+}
+
+async function exportInventoryCsv() {
+  try {
+    showToast('Generating inventory CSV...', '⏳');
+    const [accRes, phoneRes] = await Promise.all([
+      fetch('/api/items'),
+      fetch('/api/phones')
+    ]);
+    const items = await accRes.json();
+    const phones = await phoneRes.json();
+
+    let csv = '\uFEFFType,Code or IMEI,Name or Model,Category or Brand,Tak or Location,Cost Price (BDT),Selling Price (BDT),Stock or Status,Alert Limit\r\n';
+
+    if (Array.isArray(items)) {
+      for (const i of items) {
+        const row = [
+          '"Accessory"',
+          `"${i.sku_or_barcode || ''}"`,
+          `"${(i.title || '').replace(/"/g, '""')}"`,
+          `"${(i.category_name || 'General').replace(/"/g, '""')}"`,
+          `"${(i.rack_location || '-').replace(/"/g, '""')}"`,
+          Number(i.cost_price || 0).toFixed(2),
+          Number(i.selling_price || 0).toFixed(2),
+          `"${i.stock_quantity ?? 0}"`,
+          `"${i.min_alert_threshold ?? 5}"`
+        ].join(',');
+        csv += row + '\r\n';
+      }
+    }
+
+    if (Array.isArray(phones)) {
+      for (const p of phones) {
+        const isBrandNew = p.condition_grade && p.condition_grade.includes('Brand New');
+        const phoneType = isBrandNew ? 'Brand New Handset' : 'Pre-Owned Handset';
+        const detailStr = isBrandNew ? (p.warranty_type || 'Official 1-Year') : `Battery ${p.battery_health}%`;
+        const phoneTitle = `${p.brand || ''} ${p.model || ''} ${p.storage_capacity || ''} (${p.condition_grade || 'Standard'}, ${detailStr})`.trim();
+        const row = [
+          `"${phoneType}"`,
+          `"${p.imei_number || ''}"`,
+          `"${phoneTitle.replace(/"/g, '""')}"`,
+          `"${p.brand || ''}"`,
+          '"-"',
+          Number(p.purchase_cost || 0).toFixed(2),
+          Number(p.selling_price || 0).toFixed(2),
+          `"${p.status || 'In-Stock'}"`,
+          '"1"'
+        ].join(',');
+        csv += row + '\r\n';
+      }
+    }
+
+    const filename = `inventory-report-${new Date().toISOString().slice(0, 10)}.csv`;
+    await downloadOrShareCsv(filename, csv);
+  } catch (err) {
+    console.error('Inventory CSV export error:', err);
+    showToast('Failed to export inventory CSV: ' + err.message, '❌');
+  }
+}
+
+async function exportSalesCsv() {
+  try {
+    showToast('Generating sales report CSV...', '⏳');
+    const month = document.getElementById('reportMonthSelect')?.value || '';
+    const year = document.getElementById('reportYearSelect')?.value || '';
+
+    const res = await fetch('/api/orders');
+    let orders = await res.json();
+
+    if (month && year && Array.isArray(orders)) {
+      orders = orders.filter(o => {
+        const d = new Date(o.created_at);
+        return (d.getMonth() + 1) === parseInt(month, 10) && d.getFullYear() === parseInt(year, 10);
+      });
+    }
+
+    if (!orders || orders.length === 0) {
+      showToast('No sales records found for this period to export!', 'ℹ️');
+      return;
+    }
+
+    let csv = '\uFEFFInvoice #,Date,Customer,Phone,Items Count,Subtotal (BDT),Discount,Final Total (BDT),Payment Method,EMI Type,Remaining Due\r\n';
+    for (const o of orders) {
+      const itemsCount = (o.items && Array.isArray(o.items)) ? o.items.length : (o.item_count || 1);
+      const row = [
+        `"${o.invoice_number || ''}"`,
+        `"${new Date(o.created_at).toLocaleString()}"`,
+        `"${(o.customer_name || 'Walk-in Customer').replace(/"/g, '""')}"`,
+        `"${o.customer_phone || ''}"`,
+        itemsCount,
+        Number(o.subtotal || o.final_amount || 0).toFixed(2),
+        Number(o.discount_amount || 0).toFixed(2),
+        Number(o.final_amount || 0).toFixed(2),
+        `"${o.payment_method || 'Cash'}"`,
+        `"${o.is_emi ? (o.emi_type || 'EMI') : 'Full Payment'}"`,
+        Number(o.emi_remaining_due || 0).toFixed(2)
+      ].join(',');
+      csv += row + '\r\n';
+    }
+
+    const dateSuffix = (year && month) ? `${year}-${String(month).padStart(2, '0')}` : new Date().toISOString().slice(0, 10);
+    const filename = `sales-report-${dateSuffix}.csv`;
+    await downloadOrShareCsv(filename, csv);
+  } catch (err) {
+    console.error('Sales CSV export error:', err);
+    showToast('Failed to export sales CSV: ' + err.message, '❌');
+  }
 }
 
 /* =========================================================

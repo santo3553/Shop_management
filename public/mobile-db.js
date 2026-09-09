@@ -689,6 +689,53 @@ const MobileDB = {
         return this._json(this.getReportsSummary(month, year));
       }
 
+      if (pathname === '/api/reports/export/inventory.csv') {
+        const items = this.getItems('', '', false);
+        const phones = this.getPhones('', '');
+        let csv = '\uFEFFType,Code or IMEI,Name or Model,Category or Brand,Tak or Location,Cost Price (BDT),Selling Price (BDT),Stock or Status,Alert Limit\r\n';
+        for (const i of items) {
+          csv += `"Accessory","${i.sku_or_barcode || ''}","${(i.title || '').replace(/"/g, '""')}","${(i.category_name || 'General').replace(/"/g, '""')}","${(i.rack_location || '-').replace(/"/g, '""')}",${Number(i.cost_price || 0).toFixed(2)},${Number(i.selling_price || 0).toFixed(2)},"${i.stock_quantity ?? 0}","${i.min_alert_threshold ?? 5}"\r\n`;
+        }
+        for (const p of phones) {
+          const isBrandNew = p.condition_grade && p.condition_grade.includes('Brand New');
+          const phoneType = isBrandNew ? 'Brand New Handset' : 'Pre-Owned Handset';
+          const detailStr = isBrandNew ? (p.warranty_type || 'Official 1-Year') : `Battery ${p.battery_health}%`;
+          const phoneTitle = `${p.brand || ''} ${p.model || ''} ${p.storage_capacity || ''} (${p.condition_grade || 'Standard'}, ${detailStr})`.trim();
+          csv += `"${phoneType}","${p.imei_number || ''}","${phoneTitle.replace(/"/g, '""')}","${p.brand || ''}","-",${Number(p.purchase_cost || 0).toFixed(2)},${Number(p.selling_price || 0).toFixed(2)},"${p.status || 'In-Stock'}","1"\r\n`;
+        }
+        return new Response(csv, {
+          status: 200,
+          headers: {
+            'Content-Type': 'text/csv; charset=utf-8',
+            'Content-Disposition': `attachment; filename="inventory-report-${Date.now()}.csv"`
+          }
+        });
+      }
+
+      if (pathname === '/api/reports/export/sales.csv') {
+        const month = query.get('month');
+        const year = query.get('year');
+        let orders = this.getOrders('', '');
+        if (month && year) {
+          orders = orders.filter(o => {
+            const d = new Date(o.created_at);
+            return (d.getMonth() + 1) === parseInt(month, 10) && d.getFullYear() === parseInt(year, 10);
+          });
+        }
+        let csv = '\uFEFFInvoice #,Date,Customer,Phone,Items Count,Subtotal (BDT),Discount,Final Total (BDT),Payment Method,EMI Type,Remaining Due\r\n';
+        for (const o of orders) {
+          const itemsCount = (o.items && Array.isArray(o.items)) ? o.items.length : (o.item_count || 1);
+          csv += `"${o.invoice_number || ''}","${new Date(o.created_at).toLocaleString()}","${(o.customer_name || 'Walk-in Customer').replace(/"/g, '""')}","${o.customer_phone || ''}",${itemsCount},${Number(o.subtotal || o.final_amount || 0).toFixed(2)},${Number(o.discount_amount || 0).toFixed(2)},${Number(o.final_amount || 0).toFixed(2)},"${o.payment_method || 'Cash'}","${o.is_emi ? (o.emi_type || 'EMI') : 'Full Payment'}",${Number(o.emi_remaining_due || 0).toFixed(2)}\r\n`;
+        }
+        return new Response(csv, {
+          status: 200,
+          headers: {
+            'Content-Type': 'text/csv; charset=utf-8',
+            'Content-Disposition': `attachment; filename="sales-report-${Date.now()}.csv"`
+          }
+        });
+      }
+
       if (pathname === '/api/reports/export/outofstock.csv') {
         const items = this.getOutOfStockItems('all', '');
         let csv = '\uFEFFItem Type,SKU or IMEI,Product Name / Model,Category or Brand,Tak / Location,Cost Price (BDT),Selling Price (BDT),Current Stock,Min Alert Limit,Suggested Reorder Qty\r\n';
