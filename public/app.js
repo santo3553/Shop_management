@@ -2413,18 +2413,33 @@ let currentExportCsvFilename = '';
 async function downloadOrShareCsv(filename, csvContent) {
   const fullContent = csvContent.startsWith('\uFEFF') ? csvContent : ('\uFEFF' + csvContent);
 
-  // 1. Native Android App Bridge (Saves to device Downloads and opens native Android Share sheet)
+  // 1. Capacitor Native Plugin (Official bridge for Android APK)
+  try {
+    const csvPlugin = (window.Capacitor && typeof window.Capacitor.registerPlugin === 'function')
+      ? window.Capacitor.registerPlugin('CSVDownloader')
+      : (window.Capacitor && window.Capacitor.Plugins ? window.Capacitor.Plugins.CSVDownloader : null);
+
+    if (csvPlugin && typeof csvPlugin.saveAndShareCsv === 'function') {
+      await csvPlugin.saveAndShareCsv({ filename, content: fullContent });
+      showToast('CSV saved to Downloads & opened Share options!', '✅');
+      return;
+    }
+  } catch (pluginErr) {
+    console.warn('Capacitor CSVDownloader plugin failed:', pluginErr);
+  }
+
+  // 2. Android JavascriptInterface Bridge (Secondary native bridge for Android)
   if (window.AndroidCSVBridge && typeof window.AndroidCSVBridge.saveAndShareCsv === 'function') {
     try {
       window.AndroidCSVBridge.saveAndShareCsv(filename, fullContent);
       showToast('CSV saved to Downloads & opened Share options!', '✅');
       return;
     } catch (bridgeErr) {
-      console.warn('Native AndroidCSVBridge failed, falling back to Web Share / Blob:', bridgeErr);
+      console.warn('Native AndroidCSVBridge failed, falling back:', bridgeErr);
     }
   }
 
-  // 2. Modern Web Share API with files (Android Chrome, Mobile Edge, Safari)
+  // 3. Modern Web Share API with files (Android Chrome, Mobile Edge, Safari)
   if (navigator.canShare && navigator.share) {
     try {
       const file = new File([fullContent], filename, { type: 'text/csv;charset=utf-8;' });
@@ -2439,46 +2454,32 @@ async function downloadOrShareCsv(filename, csvContent) {
       }
     } catch (shareErr) {
       if (shareErr.name === 'AbortError') return; // user closed dialog
-      console.warn('navigator.share failed, trying blob download:', shareErr);
+      console.warn('navigator.share failed, trying fallback:', shareErr);
     }
   }
 
-  // 3. Browser Blob Download (<a download="filename" href="blob:...">)
-  try {
-    const blob = new Blob([fullContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', filename);
-    link.style.display = 'none';
-    document.body.appendChild(link);
-    link.click();
-    setTimeout(() => {
-      if (link.parentNode) link.parentNode.removeChild(link);
-      URL.revokeObjectURL(url);
-    }, 1000);
-    showToast(`CSV downloaded: ${filename}`, '📥');
-    return;
-  } catch (blobErr) {
-    console.warn('Blob download failed:', blobErr);
-  }
-
-  // 4. Data URI Download
-  try {
-    const uri = 'data:text/csv;charset=utf-8,' + encodeURIComponent(fullContent);
-    const link = document.createElement('a');
-    link.href = uri;
-    link.setAttribute('download', filename);
-    link.style.display = 'none';
-    document.body.appendChild(link);
-    link.click();
-    setTimeout(() => {
-      if (link.parentNode) link.parentNode.removeChild(link);
-    }, 1000);
-    showToast(`CSV downloaded: ${filename}`, '📥');
-    return;
-  } catch (uriErr) {
-    console.warn('Data URI download failed:', uriErr);
+  // 4. Desktop Browser Blob Download (Only on web desktop/browsers where Capacitor is NOT present)
+  // In Capacitor WebView, <a download> is silently ignored by Android, so we avoid fake download toasts
+  const isNativeApp = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+  if (!isNativeApp) {
+    try {
+      const blob = new Blob([fullContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', filename);
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      setTimeout(() => {
+        if (link.parentNode) link.parentNode.removeChild(link);
+        URL.revokeObjectURL(url);
+      }, 1000);
+      showToast(`CSV downloaded: ${filename}`, '📥');
+      return;
+    } catch (blobErr) {
+      console.warn('Blob download failed:', blobErr);
+    }
   }
 
   // 5. Fallback Modal: User can view, copy to clipboard, or share via WhatsApp
