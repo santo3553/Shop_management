@@ -791,15 +791,27 @@ const MobileDB = {
 MobileDB.init();
 window.MobileDB = MobileDB;
 
-// Intercept window.fetch for offline standalone mobile app
+// Intercept window.fetch for cloud sync and offline standalone mobile app
 (function() {
   const originalFetch = window.fetch;
   window.fetch = async function(resource, init) {
     const urlStr = typeof resource === 'string' ? resource : (resource && resource.url ? resource.url : '');
     if (urlStr.startsWith('/api/') || urlStr.includes('/api/')) {
+      // 1. If Firebase Cloud Sync is configured, route via FirebaseDB
+      if (window.FirebaseDB && window.FirebaseDB.isConfigured()) {
+        try {
+          return await FirebaseDB.handleApiRequest(urlStr, init);
+        } catch (fbErr) {
+          console.warn('FirebaseDB handler error, falling back to MobileDB:', fbErr);
+        }
+      }
+
+      // 2. Standalone on-device mode (MobileDB)
       if (MobileDB.isStandalone()) {
         return MobileDB.handleApiRequest(urlStr, init);
       }
+
+      // 3. Counter PC Express Server mode
       try {
         return await originalFetch(resource, init);
       } catch (networkErr) {

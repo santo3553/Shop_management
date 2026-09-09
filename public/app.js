@@ -1272,7 +1272,10 @@ function compressAndLoadImage(file, callback, maxWidth = 600, maxHeight = 600, q
       const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0, width, height);
 
-      const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+      let compressedDataUrl = canvas.toDataURL('image/webp', 0.65);
+      if (!compressedDataUrl.startsWith('data:image/webp')) {
+        compressedDataUrl = canvas.toDataURL('image/jpeg', 0.65);
+      }
       callback(compressedDataUrl);
     };
     img.src = e.target.result;
@@ -2701,3 +2704,147 @@ window.addEventListener('DOMContentLoaded', async () => {
   const port = window.location.port || '3000';
   document.getElementById('lanIpDisplay').textContent = `http://${host}:${port}`;
 });
+
+/* =========================================================
+   FIREBASE CLOUD SYNC & MULTI-DEVICE CONTROLLER
+========================================================= */
+
+function openCloudSyncModal() {
+  const cfg = (window.FirebaseConfig && window.FirebaseConfig.get) ? window.FirebaseConfig.get() : {};
+  const isConfigured = window.FirebaseConfig && window.FirebaseConfig.isConfigured();
+
+  const idInp = document.getElementById('fbCfgProjectId');
+  const keyInp = document.getElementById('fbCfgApiKey');
+  const authInp = document.getElementById('fbCfgAuthDomain');
+  const appInp = document.getElementById('fbCfgAppId');
+
+  if (idInp) idInp.value = (cfg.projectId && !cfg.projectId.includes('your-shop-pos')) ? cfg.projectId : '';
+  if (keyInp) keyInp.value = (cfg.apiKey && !cfg.apiKey.includes('YOUR_FIREBASE_API_KEY')) ? cfg.apiKey : '';
+  if (authInp) authInp.value = (cfg.authDomain && !cfg.authDomain.includes('your-shop-pos')) ? cfg.authDomain : '';
+  if (appInp) appInp.value = (cfg.appId && !cfg.appId.includes('1:123456789012')) ? cfg.appId : '';
+
+  const statusTitle = document.getElementById('cloudModalStatusTitle');
+  const statusDesc = document.getElementById('cloudModalStatusDesc');
+  const statusDot = document.getElementById('cloudModalStatusDot');
+
+  if (statusTitle && statusDesc && statusDot) {
+    if (window.FirebaseDB && window.FirebaseDB.isConfigured()) {
+      if (window.FirebaseDB.syncState === 'connected') {
+        statusDot.className = 'w-3 h-3 rounded-full bg-emerald-500 animate-pulse';
+        statusTitle.textContent = 'Cloud Synced Across Devices';
+        statusDesc.textContent = `Connected to Firebase project "${cfg.projectId}". All phones sync in real time.`;
+      } else {
+        statusDot.className = 'w-3 h-3 rounded-full bg-amber-500 animate-pulse';
+        statusTitle.textContent = 'Offline (IndexedDB Persistence)';
+        statusDesc.textContent = 'Working offline. Pending transactions will auto-sync when network returns.';
+      }
+    } else {
+      statusDot.className = 'w-3 h-3 rounded-full bg-indigo-500';
+      statusTitle.textContent = 'Local-Only Mode Active';
+      statusDesc.textContent = 'Data is stored on this phone. Enter your free Firebase credentials below to sync across all phones!';
+    }
+  }
+
+  openModal('modalCloudSync');
+}
+
+async function saveAndConnectFirebase() {
+  const projectId = (document.getElementById('fbCfgProjectId')?.value || '').trim();
+  const apiKey = (document.getElementById('fbCfgApiKey')?.value || '').trim();
+  const authDomain = (document.getElementById('fbCfgAuthDomain')?.value || '').trim() || `${projectId}.firebaseapp.com`;
+  const appId = (document.getElementById('fbCfgAppId')?.value || '').trim();
+  const storageBucket = `${projectId}.appspot.com`;
+
+  if (!projectId || !apiKey || !appId) {
+    showToast('Please provide Project ID, API Key, and App ID.', '⚠️');
+    return;
+  }
+
+  const newConfig = {
+    apiKey,
+    authDomain,
+    projectId,
+    storageBucket,
+    appId
+  };
+
+  try {
+    showToast('Connecting to Firebase Cloud...', '⏳');
+    window.FirebaseConfig.save(newConfig);
+
+    const success = await window.FirebaseDB.init();
+    if (success) {
+      showToast('Firebase Cloud Connected & Synced!', '☁️');
+      closeModal('modalCloudSync');
+      loadPosCatalog();
+      loadAccessoriesTable();
+      loadPhonesTable();
+      updateOutOfStockBadge();
+    } else {
+      showToast('Connection failed. Check your Firebase credentials or network.', '❌');
+    }
+  } catch (err) {
+    console.error('Firebase save error:', err);
+    showToast('Failed to connect: ' + err.message, '❌');
+  }
+}
+
+async function triggerLocalToCloudMigration() {
+  if (!window.FirebaseDB || !window.FirebaseDB.isConfigured()) {
+    showToast('Please connect Firebase Cloud first before uploading local stock.', '⚠️');
+    return;
+  }
+
+  if (!confirm('Upload all existing products and handsets from this phone to Firebase Cloud? Other phones will immediately receive them.')) {
+    return;
+  }
+
+  try {
+    showToast('Uploading local inventory to Firebase Cloud...', '⏳');
+    const result = await window.FirebaseDB.migrateFromLocalDB();
+    showToast(`Successfully uploaded ${result.migratedCount} items to Cloud!`, '🚀');
+    loadPosCatalog();
+    loadAccessoriesTable();
+    loadPhonesTable();
+    updateOutOfStockBadge();
+  } catch (err) {
+    console.error('Migration error:', err);
+    showToast('Upload failed: ' + err.message, '❌');
+  }
+}
+
+function resetFirebaseToLocal() {
+  if (!confirm('Disconnect from Firebase Cloud and switch back to Local-Only mode on this phone?')) return;
+  if (window.FirebaseConfig) window.FirebaseConfig.clear();
+  if (window.FirebaseDB) {
+    window.FirebaseDB.syncState = 'local_only';
+    window.FirebaseDB._updateStatusUI();
+  }
+  showToast('Switched to Local-Only mode.', '📱');
+  closeModal('modalCloudSync');
+  loadPosCatalog();
+  loadAccessoriesTable();
+  loadPhonesTable();
+  updateOutOfStockBadge();
+}
+
+// Attach Real-Time Multi-Device Listener
+if (window.FirebaseDB && window.FirebaseDB.onSync) {
+  window.FirebaseDB.onSync((type, data) => {
+    console.log(`[Realtime Sync Event] Received updated ${type} from Cloud`);
+    if (type === 'items' || type === 'phones') {
+      loadPosCatalog();
+      if (state.activeTab === 'inventory') {
+        loadAccessoriesTable();
+        loadPhonesTable();
+        loadOutOfStock();
+      }
+      updateOutOfStockBadge();
+    } else if (type === 'categories') {
+      loadCategories();
+    } else if (type === 'orders') {
+      if (state.activeTab === 'orders') loadInvoices();
+      if (state.activeTab === 'reports') loadReports();
+    }
+  });
+}
