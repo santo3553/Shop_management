@@ -9,12 +9,13 @@
    ========================================================= */
 
 const DEFAULT_FIREBASE_CONFIG = {
-  apiKey: "AIzaSyYOUR_FIREBASE_API_KEY_HERE",
-  authDomain: "your-shop-pos.firebaseapp.com",
-  projectId: "your-shop-pos",
-  storageBucket: "your-shop-pos.appspot.com",
-  messagingSenderId: "123456789012",
-  appId: "1:123456789012:web:abcdef1234567890"
+  apiKey: "AIzaSyBX20ItWV9PwnaxVxherqUmSOZ8-RrpQ78",
+  authDomain: "mobile-decor-and-tech.firebaseapp.com",
+  projectId: "mobile-decor-and-tech",
+  storageBucket: "mobile-decor-and-tech.firebasestorage.app",
+  messagingSenderId: "169839397452",
+  appId: "1:169839397452:web:b558969bb7818dd40682e9",
+  measurementId: "G-2K4Z96QXHJ"
 };
 
 const FirebaseConfig = {
