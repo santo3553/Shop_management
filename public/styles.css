@@ -65,6 +65,39 @@ body.role-staff .owner-only-action {
   display: none !important;
 }
 
+/* Keypad shake animation on invalid PIN */
+@keyframes pinShake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-10px); }
+  40%, 80% { transform: translateX(10px); }
+}
+.animate-shake {
+  animation: pinShake 0.4s ease-in-out;
+}
+
+/* Lock screen tactile numpad button */
+.lock-key-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  border-radius: 9999px;
+  width: 68px;
+  height: 68px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 22px;
+  transition: all 0.12s ease;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.lock-key-btn:active {
+  background: rgba(255, 255, 255, 0.28);
+  transform: scale(0.92);
+}
+
 /* Native dialog styling */
 dialog {
   border: none;

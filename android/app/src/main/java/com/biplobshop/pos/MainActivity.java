@@ -14,6 +14,9 @@ import android.view.WindowManager;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebView;
 import android.widget.Toast;
+import androidx.biometric.BiometricManager;
+import androidx.biometric.BiometricPrompt;
+import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
@@ -24,6 +27,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.Executor;
 
 public class MainActivity extends BridgeActivity {
 
@@ -153,6 +157,75 @@ public class MainActivity extends BridgeActivity {
         }
     }
 
+    public class AndroidBiometricBridge {
+        private final MainActivity mActivity;
+
+        public AndroidBiometricBridge(MainActivity activity) {
+            this.mActivity = activity;
+        }
+
+        @JavascriptInterface
+        public boolean isBiometricAvailable() {
+            try {
+                BiometricManager biometricManager = BiometricManager.from(mActivity);
+                int canAuth = biometricManager.canAuthenticate(
+                    BiometricManager.Authenticators.BIOMETRIC_STRONG | BiometricManager.Authenticators.BIOMETRIC_WEAK
+                );
+                return canAuth == BiometricManager.BIOMETRIC_SUCCESS;
+            } catch (Exception e) {
+                return false;
+            }
+        }
+
+        @JavascriptInterface
+        public void promptBiometric() {
+            mActivity.runOnUiThread(() -> {
+                try {
+                    Executor executor = ContextCompat.getMainExecutor(mActivity);
+                    BiometricPrompt biometricPrompt = new BiometricPrompt(mActivity, executor,
+                        new BiometricPrompt.AuthenticationCallback() {
+                            @Override
+                            public void onAuthenticationSucceeded(BiometricPrompt.AuthenticationResult result) {
+                                super.onAuthenticationSucceeded(result);
+                                if (mActivity.getBridge() != null && mActivity.getBridge().getWebView() != null) {
+                                    mActivity.getBridge().getWebView().evaluateJavascript("window.AuthSecurity && window.AuthSecurity.onBiometricSuccess()", null);
+                                }
+                            }
+
+                            @Override
+                            public void onAuthenticationError(int errorCode, CharSequence errString) {
+                                super.onAuthenticationError(errorCode, errString);
+                                if (errorCode != BiometricPrompt.ERROR_USER_CANCELED && errorCode != BiometricPrompt.ERROR_NEGATIVE_BUTTON) {
+                                    if (mActivity.getBridge() != null && mActivity.getBridge().getWebView() != null) {
+                                        String safeErr = errString != null ? errString.toString().replace("'", "\\'") : "";
+                                        mActivity.getBridge().getWebView().evaluateJavascript("window.AuthSecurity && window.AuthSecurity.onBiometricError('" + safeErr + "')", null);
+                                    }
+                                }
+                            }
+
+                            @Override
+                            public void onAuthenticationFailed() {
+                                super.onAuthenticationFailed();
+                                if (mActivity.getBridge() != null && mActivity.getBridge().getWebView() != null) {
+                                    mActivity.getBridge().getWebView().evaluateJavascript("window.AuthSecurity && window.AuthSecurity.onBiometricFailed()", null);
+                                }
+                            }
+                        });
+
+                    BiometricPrompt.PromptInfo promptInfo = new BiometricPrompt.PromptInfo.Builder()
+                        .setTitle("Biplob POS Owner Login")
+                        .setSubtitle("Touch the fingerprint sensor to unlock in Owner Mode")
+                        .setNegativeButtonText("Use PIN")
+                        .build();
+
+                    biometricPrompt.authenticate(promptInfo);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            });
+        }
+    }
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(CSVDownloaderPlugin.class);
@@ -223,6 +296,7 @@ public class MainActivity extends BridgeActivity {
             if (getBridge() != null && getBridge().getWebView() != null) {
                 WebView wv = getBridge().getWebView();
                 wv.addJavascriptInterface(new AndroidCSVBridge(this), "AndroidCSVBridge");
+                wv.addJavascriptInterface(new AndroidBiometricBridge(this), "AndroidBiometricBridge");
             }
         } catch (Exception e) {
             e.printStackTrace();

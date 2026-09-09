@@ -53,6 +53,17 @@ const AuthSecurity = {
 
     // Try synchronizing with Firestore cloud config if available
     this._syncFromCloud();
+
+    // Listen for cancel event on native dialog
+    const pinModal = document.getElementById('modalPinChallenge');
+    if (pinModal) {
+      pinModal.addEventListener('cancel', () => {
+        this.closePinModal();
+      });
+    }
+
+    // Launch Unified Security Gate Lock Screen on app start
+    this.showLockScreen();
   },
 
   /**
@@ -176,6 +187,10 @@ const AuthSecurity = {
   /**
    * Requests Owner PIN to permanently switch session into Owner Mode
    */
+  requestOwnerRole(actionTitle = 'Enter Owner PIN to Unlock Owner Mode') {
+    return this.requestOwnerLogin(actionTitle);
+  },
+
   requestOwnerLogin(actionTitle = 'Enter Owner PIN to Unlock Full Access') {
     return new Promise((resolve) => {
       if (this.isOwner()) {
@@ -200,7 +215,6 @@ const AuthSecurity = {
   _openPinModal(title, subtext, isRoleSwitch = false) {
     const modal = document.getElementById('modalPinChallenge');
     if (!modal) {
-      // Fallback to prompt if modal HTML not yet inserted
       const input = prompt(`${title}\n${subtext}\nEnter Owner PIN:`);
       this.verifyOwnerPin(input).then(valid => {
         if (this.activeChallengeResolver) this.activeChallengeResolver(valid);
@@ -218,13 +232,21 @@ const AuthSecurity = {
     if (subEl) subEl.textContent = subtext || 'Please enter Owner PIN to proceed';
     if (inputEl) {
       inputEl.value = '';
-      inputEl.focus();
     }
     if (errEl) errEl.classList.add('hidden');
 
+    try {
+      if (typeof modal.showModal === 'function') {
+        modal.showModal();
+      } else {
+        modal.setAttribute('open', '');
+      }
+    } catch (_) {
+      modal.setAttribute('open', '');
+    }
+
     modal.classList.remove('hidden');
-    modal.classList.add('flex');
-    if (inputEl) setTimeout(() => inputEl.focus(), 100);
+    if (inputEl) setTimeout(() => inputEl.focus(), 150);
   },
 
   /**
@@ -237,10 +259,11 @@ const AuthSecurity = {
 
     const isValid = await this.verifyOwnerPin(pin);
     if (isValid) {
+      const resolver = this.activeChallengeResolver;
+      this.activeChallengeResolver = null;
       this.closePinModal();
-      if (this.activeChallengeResolver) {
-        this.activeChallengeResolver(true);
-        this.activeChallengeResolver = null;
+      if (resolver) {
+        resolver(true);
       }
     } else {
       if (errEl) {
@@ -257,21 +280,199 @@ const AuthSecurity = {
   closePinModal() {
     const modal = document.getElementById('modalPinChallenge');
     if (modal) {
+      try {
+        if (typeof modal.close === 'function') {
+          modal.close();
+        } else {
+          modal.removeAttribute('open');
+        }
+      } catch (_) {
+        modal.removeAttribute('open');
+      }
       modal.classList.add('hidden');
-      modal.classList.remove('flex');
     }
     if (this.activeChallengeResolver) {
-      this.activeChallengeResolver(false);
+      const resolver = this.activeChallengeResolver;
       this.activeChallengeResolver = null;
+      resolver(false);
     }
   },
 
+  /* =========================================================
+     UNIFIED APP LAUNCH LOCK SCREEN & BIOMETRICS
+  ========================================================= */
+  lockPinBuffer: '',
+  isAppLocked: true,
+
+  showLockScreen() {
+    this.isAppLocked = true;
+    this.lockPinBuffer = '';
+    const screen = document.getElementById('appLaunchLockScreen');
+    if (screen) {
+      screen.classList.remove('hidden');
+      screen.classList.add('flex');
+    }
+    this._renderLockDots();
+    const errEl = document.getElementById('lockScreenError');
+    if (errEl) errEl.classList.add('hidden');
+
+    // Prompt native biometric prompt if available on device
+    setTimeout(() => {
+      try {
+        if (window.AndroidBiometricBridge && typeof window.AndroidBiometricBridge.isBiometricAvailable === 'function') {
+          if (window.AndroidBiometricBridge.isBiometricAvailable()) {
+            window.AndroidBiometricBridge.promptBiometric();
+          }
+        }
+      } catch (_) {}
+    }, 400);
+  },
+
+  hideLockScreen() {
+    this.isAppLocked = false;
+    this.lockPinBuffer = '';
+    const screen = document.getElementById('appLaunchLockScreen');
+    if (screen) {
+      screen.classList.add('hidden');
+      screen.classList.remove('flex');
+    }
+  },
+
+  lockApp() {
+    this.currentRole = 'staff';
+    this.updateUI();
+    this.showLockScreen();
+  },
+
+  async handleLockDigit(digit) {
+    if (this.lockPinBuffer.length >= 6) return;
+    this.lockPinBuffer += String(digit);
+    this._renderLockDots();
+
+    const pin = this.lockPinBuffer;
+
+    // Check automatically when 4 digits or more are entered
+    if (pin.length >= 4) {
+      const isOwner = await this.verifyOwnerPin(pin);
+      if (isOwner) {
+        this._unlockAsOwner('Owner PIN');
+        return;
+      }
+
+      const isStaff = await this.verifyStaffPin(pin);
+      if (isStaff) {
+        this._unlockAsStaff('Staff PIN');
+        return;
+      }
+
+      // If reached 6 digits and failed, shake and reset
+      if (pin.length >= 6) {
+        this._shakeLockScreen();
+      }
+    }
+  },
+
+  handleLockBackspace() {
+    if (this.lockPinBuffer.length > 0) {
+      this.lockPinBuffer = this.lockPinBuffer.slice(0, -1);
+      this._renderLockDots();
+    }
+  },
+
+  handleLockClear() {
+    this.lockPinBuffer = '';
+    this._renderLockDots();
+    const errEl = document.getElementById('lockScreenError');
+    if (errEl) errEl.classList.add('hidden');
+  },
+
+  _renderLockDots() {
+    const dots = document.querySelectorAll('.lock-pin-dot');
+    dots.forEach((dot, idx) => {
+      if (idx < this.lockPinBuffer.length) {
+        dot.className = 'lock-pin-dot w-4 h-4 rounded-full bg-indigo-400 border-2 border-indigo-300 shadow-[0_0_10px_rgba(129,140,248,0.8)] transition-all transform scale-110';
+      } else {
+        dot.className = 'lock-pin-dot w-4 h-4 rounded-full bg-white/10 border-2 border-white/20 transition-all';
+      }
+    });
+  },
+
+  _shakeLockScreen() {
+    const container = document.getElementById('lockDotsContainer');
+    const errEl = document.getElementById('lockScreenError');
+    if (errEl) {
+      errEl.textContent = '❌ Invalid PIN. Please try again.';
+      errEl.classList.remove('hidden');
+    }
+    const dots = document.querySelectorAll('.lock-pin-dot');
+    dots.forEach(dot => {
+      dot.className = 'lock-pin-dot w-4 h-4 rounded-full bg-red-500 border-2 border-red-400 shadow-[0_0_12px_rgba(239,68,68,0.9)]';
+    });
+
+    if (container) {
+      container.classList.add('animate-shake');
+      setTimeout(() => container.classList.remove('animate-shake'), 450);
+    }
+
+    if (window.playBeep) window.playBeep(220, 'sawtooth', 0.25);
+
+    setTimeout(() => {
+      this.handleLockClear();
+    }, 600);
+  },
+
+  _unlockAsOwner(method = 'PIN') {
+    this.currentRole = 'owner';
+    this._resetAutoLockTimer();
+    this.updateUI();
+    this.hideLockScreen();
+    this._notifyListeners();
+    if (window.playBeep) window.playBeep(880, 'sine', 0.15);
+    if (window.showToast) window.showToast('Welcome, Owner! Unlocked in Owner Mode. 👑', '👑');
+    this.logAudit('OWNER_UNLOCK', `Unlocked via ${method}`);
+  },
+
+  _unlockAsStaff(method = 'PIN') {
+    this.currentRole = 'staff';
+    this.updateUI();
+    this.hideLockScreen();
+    this._notifyListeners();
+    if (window.playBeep) window.playBeep(660, 'sine', 0.12);
+    if (window.showToast) window.showToast('Welcome, Staff! Register ready. 👤', '👤');
+    this.logAudit('STAFF_UNLOCK', `Unlocked via ${method}`);
+  },
+
+  triggerBiometric() {
+    if (window.AndroidBiometricBridge && typeof window.AndroidBiometricBridge.promptBiometric === 'function') {
+      window.AndroidBiometricBridge.promptBiometric();
+    } else {
+      if (window.showToast) window.showToast('Fingerprint sensor not available on this device. Please enter PIN.', 'ℹ️');
+    }
+  },
+
+  onBiometricSuccess() {
+    this._unlockAsOwner('Fingerprint / Biometrics');
+  },
+
+  onBiometricFailed() {
+    const errEl = document.getElementById('lockScreenError');
+    if (errEl) {
+      errEl.textContent = '❌ Fingerprint not recognized. Try again or enter PIN.';
+      errEl.classList.remove('hidden');
+    }
+    if (window.playBeep) window.playBeep(220, 'sawtooth', 0.2);
+  },
+
+  onBiometricError(err) {
+    console.warn('Biometric notice:', err);
+  },
+
   /**
-   * Auto-Lock setup: drops to Staff mode after 2 minutes of idle inactivity
+   * Auto-Lock setup: drops to Staff mode and locks screen after 2 minutes of idle inactivity
    */
   _setupAutoLockListeners() {
     const resetTimer = () => {
-      if (this.isOwner()) {
+      if (this.isOwner() && !this.isAppLocked) {
         this._resetAutoLockTimer();
       }
     };
@@ -282,9 +483,20 @@ const AuthSecurity = {
 
     // Auto-lock when phone screen turns off or app is minimized
     document.addEventListener('visibilitychange', () => {
-      if (document.hidden && this.isOwner()) {
-        this.logoutToStaff();
-        if (window.showToast) window.showToast('Locked to Staff Mode for security.', '🔒');
+      if (document.hidden && !this.isAppLocked) {
+        this.lockApp();
+      }
+    });
+
+    // Keyboard listener for lock screen
+    window.addEventListener('keydown', (e) => {
+      if (!this.isAppLocked) return;
+      if (/^[0-9]$/.test(e.key)) {
+        this.handleLockDigit(e.key);
+      } else if (e.key === 'Backspace') {
+        this.handleLockBackspace();
+      } else if (e.key === 'Escape' || e.key === 'c' || e.key === 'C') {
+        this.handleLockClear();
       }
     });
   },
@@ -292,9 +504,9 @@ const AuthSecurity = {
   _resetAutoLockTimer() {
     if (this.autoLockTimer) clearTimeout(this.autoLockTimer);
     this.autoLockTimer = setTimeout(() => {
-      if (this.isOwner()) {
-        this.logoutToStaff();
-        if (window.showToast) window.showToast('Auto-locked to Staff Mode after 2m idle.', '🔒');
+      if (this.isOwner() && !this.isAppLocked) {
+        this.lockApp();
+        if (window.showToast) window.showToast('Auto-locked to Security Screen after 2m idle.', '🔒');
       }
     }, this.AUTO_LOCK_TIMEOUT_MS);
   },

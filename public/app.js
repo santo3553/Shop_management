@@ -107,7 +107,9 @@ document.addEventListener('click', (e) => {
       rect.left <= e.clientX && e.clientX <= rect.left + rect.width
     );
     if (!isInDialog) {
-      if (typeof e.target.close === 'function') {
+      if (e.target.id === 'modalPinChallenge' && window.AuthSecurity) {
+        window.AuthSecurity.closePinModal();
+      } else if (typeof e.target.close === 'function') {
         e.target.close();
       } else {
         e.target.removeAttribute('open');
@@ -3113,9 +3115,11 @@ async function switchRoleAction() {
   if (!window.AuthSecurity) return;
   if (window.AuthSecurity.isOwner()) {
     window.AuthSecurity.logoutToStaff();
+    closeModal('modalSecuritySettings');
     showToast('Locked to Staff Mode. Wholesale costs hidden.', '🔒');
   } else {
-    const success = await window.AuthSecurity.requestOwnerRole();
+    closeModal('modalSecuritySettings');
+    const success = await window.AuthSecurity.requestOwnerRole('Switch to Owner Mode');
     if (success) {
       showToast('Welcome, Owner! All management tools unlocked.', '👑');
     }
@@ -3209,6 +3213,7 @@ async function executeVoidInvoice() {
 
   // Verify Owner authorization
   if (window.AuthSecurity && !window.AuthSecurity.isOwner()) {
+    closeModal('modalVoidInvoice');
     const authorized = await window.AuthSecurity.requestOwnerOverride(
       'Manager Void Authorization',
       `Owner PIN required to void invoice ${orderId} and replenish inventory.`
@@ -3217,6 +3222,8 @@ async function executeVoidInvoice() {
       showToast('Invoice voiding aborted: Owner PIN required.', '🔒');
       return;
     }
+  } else {
+    closeModal('modalVoidInvoice');
   }
 
   try {
@@ -3229,7 +3236,6 @@ async function executeVoidInvoice() {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed to void invoice');
 
-    closeModal('modalVoidInvoice');
     playBeep(880, 'sine', 0.15);
     showToast(`Invoice ${orderId} voided! Inventory replenished.`, '✅');
 

@@ -14,6 +14,85 @@
 </head>
 <body class="bg-gray-100 text-gray-900 min-h-screen flex flex-col font-sans antialiased">
 
+  <!-- =========================================================
+       UNIFIED APP LAUNCH LOCK SCREEN & BIOMETRIC GATEWAY
+       Displays on app boot, minimized resume, and manual lock.
+       Owner PIN: 1234 (Default) -> Unlocks Full Owner Mode
+       Staff PIN: 0000 (Default) -> Unlocks Staff Register
+       Fingerprint: Native Biometrics -> Unlocks Owner Mode
+  ========================================================= -->
+  <div id="appLaunchLockScreen" class="fixed inset-0 z-[9999] bg-gradient-to-br from-gray-950 via-indigo-950 to-slate-950 text-white flex flex-col items-center justify-between p-6 select-none overflow-hidden hidden">
+    
+    <!-- Top Branding & Status -->
+    <div class="flex flex-col items-center text-center pt-4 sm:pt-8 animate-in fade-in duration-300">
+      <div class="relative mb-3">
+        <img src="logo.png" class="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-contain bg-black shadow-2xl border-2 border-indigo-500/40 p-1.5" alt="Shop Logo">
+        <span class="absolute -bottom-1 -right-1 bg-indigo-600 text-[10px] font-bold px-1.5 py-0.5 rounded-full border border-indigo-400">POS</span>
+      </div>
+      <h2 class="text-xl sm:text-2xl font-black tracking-tight text-white">Mobile Decor &amp; Tech</h2>
+      <p class="text-xs text-indigo-300 mt-0.5 font-medium">Smartphones &amp; Accessories • Terminal Security</p>
+      
+      <div class="mt-4 sm:mt-6 flex flex-col items-center">
+        <div class="flex items-center space-x-1.5 text-xs text-indigo-200 bg-indigo-900/60 border border-indigo-700/50 px-3 py-1 rounded-full shadow-inner">
+          <span class="text-sm">🔒</span>
+          <span class="font-semibold tracking-wide">Enter PIN to Unlock</span>
+        </div>
+        <p class="text-[11px] text-gray-400 mt-1.5">Owner PIN (1234) • Staff PIN (0000)</p>
+      </div>
+
+      <!-- PIN Indicator Dots -->
+      <div id="lockDotsContainer" class="flex items-center justify-center space-x-3.5 mt-5">
+        <div class="lock-pin-dot w-4 h-4 rounded-full bg-white/10 border-2 border-white/20 transition-all"></div>
+        <div class="lock-pin-dot w-4 h-4 rounded-full bg-white/10 border-2 border-white/20 transition-all"></div>
+        <div class="lock-pin-dot w-4 h-4 rounded-full bg-white/10 border-2 border-white/20 transition-all"></div>
+        <div class="lock-pin-dot w-4 h-4 rounded-full bg-white/10 border-2 border-white/20 transition-all"></div>
+        <div class="lock-pin-dot w-4 h-4 rounded-full bg-white/10 border-2 border-white/20 transition-all"></div>
+        <div class="lock-pin-dot w-4 h-4 rounded-full bg-white/10 border-2 border-white/20 transition-all"></div>
+      </div>
+
+      <!-- Error notification text -->
+      <div id="lockScreenError" class="text-xs font-bold text-red-400 bg-red-950/80 border border-red-800/80 px-3.5 py-1.5 rounded-full mt-3 hidden flex items-center space-x-1.5 shadow-lg">
+        <span>❌ Invalid PIN. Please try again.</span>
+      </div>
+    </div>
+
+    <!-- Tactile Touchscreen Keypad (3x4 Grid) -->
+    <div class="w-full max-w-[280px] sm:max-w-xs grid grid-cols-3 gap-3.5 sm:gap-4 my-auto place-items-center">
+      <button type="button" onclick="AuthSecurity.handleLockDigit('1')" class="lock-key-btn">1</button>
+      <button type="button" onclick="AuthSecurity.handleLockDigit('2')" class="lock-key-btn">2</button>
+      <button type="button" onclick="AuthSecurity.handleLockDigit('3')" class="lock-key-btn">3</button>
+
+      <button type="button" onclick="AuthSecurity.handleLockDigit('4')" class="lock-key-btn">4</button>
+      <button type="button" onclick="AuthSecurity.handleLockDigit('5')" class="lock-key-btn">5</button>
+      <button type="button" onclick="AuthSecurity.handleLockDigit('6')" class="lock-key-btn">6</button>
+
+      <button type="button" onclick="AuthSecurity.handleLockDigit('7')" class="lock-key-btn">7</button>
+      <button type="button" onclick="AuthSecurity.handleLockDigit('8')" class="lock-key-btn">8</button>
+      <button type="button" onclick="AuthSecurity.handleLockDigit('9')" class="lock-key-btn">9</button>
+
+      <!-- Biometric Trigger Button -->
+      <button type="button" onclick="AuthSecurity.triggerBiometric()" class="lock-key-btn !text-indigo-300 hover:!text-white border-indigo-500/30" title="Unlock with Fingerprint">
+        <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 004.07 9.14" />
+        </svg>
+      </button>
+      
+      <button type="button" onclick="AuthSecurity.handleLockDigit('0')" class="lock-key-btn">0</button>
+
+      <!-- Backspace Button -->
+      <button type="button" onclick="AuthSecurity.handleLockBackspace()" class="lock-key-btn !text-gray-300 active:!text-white" title="Backspace">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M3 12l6.414 6.414a2 2 0 001.414.586H19a2 2 0 002-2V7a2 2 0 00-2-2h-8.172a2 2 0 00-1.414.586L3 12z"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Footer Info -->
+    <div class="pb-2 sm:pb-4 text-center">
+      <p class="text-[11px] text-gray-500 font-mono">Mobile Decor &amp; Tech • Hardware Protected</p>
+    </div>
+  </div>
+
   <!-- TOP APP BAR -->
   <header class="app-header bg-indigo-900 text-white shadow-md sticky top-0 z-40">
     <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
@@ -55,7 +134,11 @@
         </nav>
 
         <!-- SECURITY ROLE, 1-TAP BACKUP & CLOUD SYNC -->
-        <div class="flex items-center space-x-1.5 sm:space-x-2 text-xs flex-shrink-0">
+        <div class="flex items-center space-x-1 sm:space-x-2 text-xs flex-shrink-0">
+          <button onclick="AuthSecurity.lockApp()" id="quickLockBtn" class="flex items-center space-x-1 bg-red-950/80 hover:bg-red-900 text-red-200 px-2 py-1 sm:px-2.5 sm:py-1 rounded-md border border-red-700/60 text-[11px] font-semibold cursor-pointer transition shadow-sm active:scale-95" title="Lock Terminal Immediately">
+            <span>🔒</span>
+            <span class="hidden sm:inline">Lock</span>
+          </button>
           <button onclick="openSecurityModal()" id="roleBadge" class="flex items-center space-x-1.5 bg-indigo-950/70 text-indigo-200 px-2 py-1 sm:px-2.5 sm:py-1 rounded-md border border-indigo-700/50 text-[11px] font-semibold cursor-pointer hover:bg-indigo-900 transition shadow-sm" title="Click to unlock Owner View or lock to Staff Mode">
             <span class="w-2 h-2 rounded-full bg-blue-400"></span>
             <span>👤 Staff Mode</span>
@@ -1461,8 +1544,8 @@
   <!-- =========================================================
        SECURITY MODAL 1: PIN CHALLENGE (NUMPAD & INPUT)
   ========================================================= -->
-  <div id="modalPinChallenge" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs hidden items-center justify-center p-4">
-    <div class="bg-white rounded-2xl shadow-2xl max-w-xs w-full overflow-hidden border border-gray-200 animate-in fade-in zoom-in-95 duration-150">
+  <dialog id="modalPinChallenge" class="p-0 rounded-2xl shadow-2xl max-w-xs w-full bg-white backdrop:bg-black/70 overflow-hidden border border-gray-200 m-auto">
+    <div class="w-full">
       <div class="bg-gradient-to-r from-indigo-900 to-indigo-950 p-4 text-white text-center relative">
         <div class="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center mx-auto mb-2 text-2xl shadow-inner">
           🔒
@@ -1515,7 +1598,7 @@
         </div>
       </div>
     </div>
-  </div>
+  </dialog>
 
   <!-- =========================================================
        SECURITY MODAL 2: SECURITY SETTINGS & ROLE MANAGEMENT
