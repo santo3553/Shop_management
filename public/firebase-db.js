@@ -380,7 +380,8 @@ const FirebaseDB = {
   async addAccessory(data) {
     if (!this.isConfigured()) throw new Error('Firebase not configured');
     const docId = String(Date.now());
-    const cleanImg = await this.compressImageToWebP(data.image_url || '');
+    const rawImg = data.image_url || data.image || '';
+    const cleanImg = await this.compressImageToWebP(rawImg);
 
     const record = {
       id: docId,
@@ -393,6 +394,7 @@ const FirebaseDB = {
       stock_quantity: Number(data.stock_quantity || 0),
       min_alert_threshold: Number(data.min_alert_threshold || 5),
       rack_location: (data.rack_location || '-').trim(),
+      image: cleanImg,
       image_url: cleanImg,
       is_active: 1,
       created_at: new Date().toISOString()
@@ -405,8 +407,11 @@ const FirebaseDB = {
   async updateAccessory(id, data) {
     if (!this.isConfigured()) throw new Error('Firebase not configured');
     const updates = { ...data, updated_at: new Date().toISOString() };
-    if (updates.image_url && updates.image_url.startsWith('data:')) {
-      updates.image_url = await this.compressImageToWebP(updates.image_url);
+    const rawImg = updates.image || updates.image_url;
+    if (rawImg && rawImg.startsWith('data:')) {
+      const cleanImg = await this.compressImageToWebP(rawImg);
+      updates.image = cleanImg;
+      updates.image_url = cleanImg;
     }
     await this.db.collection('items').doc(String(id)).update(updates);
     return { success: true };
@@ -446,7 +451,8 @@ const FirebaseDB = {
       throw new Error('Handset with IMEI ' + imei + ' already exists in inventory!');
     }
 
-    const cleanImg = await this.compressImageToWebP(data.image_url || '');
+    const rawImg = data.image_url || data.image || '';
+    const cleanImg = await this.compressImageToWebP(rawImg);
 
     const record = {
       id: imei,
@@ -461,6 +467,7 @@ const FirebaseDB = {
       purchase_cost: Number(data.purchase_cost || 0),
       selling_price: Number(data.selling_price || 0),
       status: 'In-Stock',
+      image: cleanImg,
       image_url: cleanImg,
       created_at: new Date().toISOString()
     };
@@ -471,8 +478,15 @@ const FirebaseDB = {
 
   async updatePhone(idOrImei, data) {
     if (!this.isConfigured()) throw new Error('Firebase not configured');
+    const updates = { ...data, updated_at: new Date().toISOString() };
+    const rawImg = updates.image || updates.image_url;
+    if (rawImg && rawImg.startsWith('data:')) {
+      const cleanImg = await this.compressImageToWebP(rawImg);
+      updates.image = cleanImg;
+      updates.image_url = cleanImg;
+    }
     const docRef = this.db.collection('phones').doc(String(idOrImei).trim());
-    await docRef.update({ ...data, updated_at: new Date().toISOString() });
+    await docRef.update(updates);
     return { success: true };
   },
 
@@ -775,54 +789,81 @@ const FirebaseDB = {
       // 5. POS Search
       if (pathname === '/api/pos/search') {
         const q = (query.get('q') || '').toLowerCase().trim();
-        if (!q) return this._json([]);
 
-        const results = [];
-        this.cache.items.forEach(i => {
-          if (Number(i.stock_quantity || 0) > 0) {
-            const matches = (i.title && i.title.toLowerCase().includes(q)) || 
-                            (i.sku_or_barcode && i.sku_or_barcode.toLowerCase().includes(q)) ||
-                            (i.category_name && i.category_name.toLowerCase().includes(q));
-            if (matches) {
-              results.push({
-                id: i.id,
-                item_type: 'accessory',
-                sku_or_imei: i.sku_or_barcode,
-                title: i.title,
-                category_name: i.category_name || 'General',
-                unit_price: Number(i.selling_price || 0),
-                unit_cost: Number(i.cost_price || 0),
-                stock_quantity: Number(i.stock_quantity || 0),
-                rack_location: i.rack_location || '-',
-                image_url: i.image_url
-              });
-            }
-          }
+        const mapAcc = (i) => ({
+          id: i.id,
+          code: i.sku_or_barcode || '',
+          sku_or_imei: i.sku_or_barcode || '',
+          title: i.title || '',
+          category_id: i.category_id || '',
+          category_name: i.category_name || 'General',
+          type: 'accessory',
+          item_type: 'accessory',
+          selling_price: parseFloat(i.selling_price) || 0,
+          unit_price: parseFloat(i.selling_price) || 0,
+          cost_price: parseFloat(i.cost_price) || 0,
+          unit_cost: parseFloat(i.cost_price) || 0,
+          stock_quantity: parseInt(i.stock_quantity, 10) || 0,
+          rack_location: i.rack_location || '-',
+          image: i.image || i.image_url || '',
+          image_url: i.image || i.image_url || ''
         });
 
-        this.cache.phones.forEach(p => {
-          if (p.status === 'In-Stock') {
-            const matches = (p.imei_number && p.imei_number.includes(q)) ||
-                            (p.brand && p.brand.toLowerCase().includes(q)) ||
-                            (p.model && p.model.toLowerCase().includes(q));
-            if (matches) {
-              results.push({
-                id: p.id || p.imei_number,
-                item_type: 'phone',
-                sku_or_imei: p.imei_number,
-                title: (p.brand + ' ' + p.model + ' ' + (p.storage_capacity || '') + ' (' + (p.condition_grade || 'Standard') + ')').trim(),
-                category_name: p.brand,
-                unit_price: Number(p.selling_price || 0),
-                unit_cost: Number(p.purchase_cost || 0),
-                stock_quantity: 1,
-                rack_location: '-',
-                image_url: p.image_url
-              });
-            }
-          }
+        const mapPhone = (p) => ({
+          id: p.id || p.imei_number,
+          code: p.imei_number || '',
+          sku_or_imei: p.imei_number || '',
+          title: `${p.brand || ''} ${p.model || ''} ${p.storage_capacity ? '(' + p.storage_capacity + ')' : ''}`.trim(),
+          category_id: null,
+          category_name: p.brand || 'Handset',
+          type: 'phone',
+          item_type: 'phone',
+          selling_price: parseFloat(p.selling_price) || 0,
+          unit_price: parseFloat(p.selling_price) || 0,
+          cost_price: parseFloat(p.purchase_cost) || 0,
+          unit_cost: parseFloat(p.purchase_cost) || 0,
+          stock_quantity: 1,
+          condition_grade: p.condition_grade || 'Brand New (Official)',
+          battery_health: p.battery_health || 100,
+          warranty_type: p.warranty_type || 'Official 1-Year',
+          status: p.status || 'In-Stock',
+          rack_location: '-',
+          image: p.image || p.image_url || '',
+          image_url: p.image || p.image_url || ''
         });
 
-        return this._json(results.slice(0, 15));
+        const inStockAccessories = this.cache.items
+          .filter(i => Number(i.stock_quantity || 0) > 0)
+          .map(mapAcc);
+
+        const inStockPhones = this.cache.phones
+          .filter(p => p.status === 'In-Stock')
+          .map(mapPhone);
+
+        if (!q) {
+          return this._json([...inStockAccessories, ...inStockPhones]);
+        }
+
+        // Exact code match
+        const exactPhone = inStockPhones.find(p => p.code.toLowerCase() === q);
+        if (exactPhone) return this._json([exactPhone]);
+
+        const exactAcc = inStockAccessories.find(a => a.code.toLowerCase() === q);
+        if (exactAcc) return this._json([exactAcc]);
+
+        // Fuzzy matches
+        const filteredAcc = inStockAccessories.filter(a =>
+          a.title.toLowerCase().includes(q) ||
+          a.code.toLowerCase().includes(q) ||
+          a.category_name.toLowerCase().includes(q)
+        );
+        const filteredPhones = inStockPhones.filter(p =>
+          p.title.toLowerCase().includes(q) ||
+          p.code.toLowerCase().includes(q) ||
+          p.category_name.toLowerCase().includes(q)
+        );
+
+        return this._json([...filteredAcc, ...filteredPhones]);
       }
 
       // 6. Orders (Checkout & Invoices)
@@ -878,6 +919,80 @@ const FirebaseDB = {
             in_stock_count: this.cache.phones.filter(p => p.status === 'In-Stock').length,
             in_stock_cost_value: this.cache.phones.filter(p => p.status === 'In-Stock').reduce((s, p) => s + Number(p.purchase_cost || 0), 0),
             sold_count: this.cache.phones.filter(p => p.status === 'Sold').length
+          }
+        });
+      }
+
+      // 9. Cloud CSV Exports
+      if (pathname === '/api/reports/export/inventory.csv') {
+        const items = this.cache.items;
+        const phones = this.cache.phones;
+        let csv = '\uFEFFType,Code or IMEI,Name or Model,Category or Brand,Tak or Location,Cost Price (BDT),Selling Price (BDT),Stock or Status,Alert Limit\r\n';
+        for (const i of items) {
+          csv += `"Accessory","${i.sku_or_barcode || ''}","${(i.title || '').replace(/"/g, '""')}","${(i.category_name || 'General').replace(/"/g, '""')}","${(i.rack_location || '-').replace(/"/g, '""')}",${Number(i.cost_price || 0).toFixed(2)},${Number(i.selling_price || 0).toFixed(2)},"${i.stock_quantity ?? 0}","${i.min_alert_threshold ?? 5}"\r\n`;
+        }
+        for (const p of phones) {
+          const isBrandNew = p.condition_grade && p.condition_grade.includes('Brand New');
+          const phoneType = isBrandNew ? 'Brand New Handset' : 'Pre-Owned Handset';
+          const detailStr = isBrandNew ? (p.warranty_type || 'Official 1-Year') : `Battery ${p.battery_health}%`;
+          const phoneTitle = `${p.brand || ''} ${p.model || ''} ${p.storage_capacity || ''} (${p.condition_grade || 'Standard'}, ${detailStr})`.trim();
+          csv += `"${phoneType}","${p.imei_number || ''}","${phoneTitle.replace(/"/g, '""')}","${p.brand || ''}","-",${Number(p.purchase_cost || 0).toFixed(2)},${Number(p.selling_price || 0).toFixed(2)},"${p.status || 'In-Stock'}","1"\r\n`;
+        }
+        return new Response(csv, {
+          status: 200,
+          headers: {
+            'Content-Type': 'text/csv; charset=utf-8',
+            'Content-Disposition': `attachment; filename="inventory-report-${Date.now()}.csv"`
+          }
+        });
+      }
+
+      if (pathname === '/api/reports/export/sales.csv') {
+        const month = query.get('month');
+        const year = query.get('year');
+        let orders = [...this.cache.orders];
+        if (month && year) {
+          orders = orders.filter(o => {
+            const d = new Date(o.created_at);
+            return (d.getMonth() + 1) === parseInt(month, 10) && d.getFullYear() === parseInt(year, 10);
+          });
+        }
+        let csv = '\uFEFFInvoice #,Date,Customer,Phone,Items Count,Subtotal (BDT),Discount,Final Total (BDT),Payment Method,EMI Type,Remaining Due\r\n';
+        for (const o of orders) {
+          const itemsCount = (o.items && Array.isArray(o.items)) ? o.items.length : (o.item_count || 1);
+          csv += `"${o.invoice_number || ''}","${new Date(o.created_at).toLocaleString()}","${(o.customer_name || 'Walk-in Customer').replace(/"/g, '""')}","${o.customer_phone || ''}",${itemsCount},${Number(o.subtotal || o.final_amount || 0).toFixed(2)},${Number(o.discount_amount || 0).toFixed(2)},${Number(o.final_amount || 0).toFixed(2)},"${o.payment_method || 'Cash'}","${o.is_emi ? (o.emi_type || 'EMI') : 'Full Payment'}",${Number(o.emi_remaining_due || 0).toFixed(2)}\r\n`;
+        }
+        return new Response(csv, {
+          status: 200,
+          headers: {
+            'Content-Type': 'text/csv; charset=utf-8',
+            'Content-Disposition': `attachment; filename="sales-report-${Date.now()}.csv"`
+          }
+        });
+      }
+
+      if (pathname === '/api/reports/export/outofstock.csv') {
+        const outAccessories = this.cache.items.filter(i => Number(i.stock_quantity || 0) <= 0);
+        const soldPhones = this.cache.phones.filter(p => p.status === 'Sold');
+        let csv = '\uFEFFItem Type,SKU or IMEI,Product Name / Model,Category or Brand,Tak / Location,Cost Price (BDT),Selling Price (BDT),Current Stock,Min Alert Limit,Suggested Reorder Qty\r\n';
+        for (const i of outAccessories) {
+          const cost = Number(i.cost_price || 0).toFixed(2);
+          const price = Number(i.selling_price || 0).toFixed(2);
+          const alert = i.min_alert_threshold || 5;
+          const reorder = Math.max(10, alert * 2);
+          csv += `"Accessory","${i.sku_or_barcode || ''}","${(i.title || '').replace(/"/g, '""')}","${(i.category_name || 'General').replace(/"/g, '""')}","${(i.rack_location || '-').replace(/"/g, '""')}",${cost},${price},"0",${alert},${reorder}\r\n`;
+        }
+        for (const p of soldPhones) {
+          const cost = Number(p.purchase_cost || 0).toFixed(2);
+          const price = Number(p.selling_price || 0).toFixed(2);
+          const name = `${p.brand || ''} ${p.model || ''} ${p.storage_capacity || ''} (${p.condition_grade || 'Pre-Owned'})`;
+          csv += `"Mobile Handset","${p.imei_number || ''}","${name.replace(/"/g, '""')}","${p.brand || ''}","-",${cost},${price},"0 (Sold)",1,1\r\n`;
+        }
+        return new Response(csv, {
+          status: 200,
+          headers: {
+            'Content-Type': 'text/csv; charset=utf-8',
+            'Content-Disposition': `attachment; filename="outofstock-products-${Date.now()}.csv"`
           }
         });
       }
