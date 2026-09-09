@@ -231,27 +231,34 @@ function switchInventorySubTab(subTab) {
 async function loadCategories() {
   try {
     const res = await fetch('/api/categories');
-    const categories = await res.json();
-    state.categories = categories;
+    const data = await res.json();
+    state.categories = Array.isArray(data) ? data : [];
 
     // Populate Category filter in Inventory
     const invCatFilter = document.getElementById('invCatFilter');
-    invCatFilter.innerHTML = '<option value="">All Categories</option>' +
-      categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+    if (invCatFilter) {
+      invCatFilter.innerHTML = '<option value="">All Categories</option>' +
+        state.categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+    }
 
     // Populate Item Modal category select
     const itemCatSelect = document.getElementById('itemCategory');
-    itemCatSelect.innerHTML = categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+    if (itemCatSelect) {
+      itemCatSelect.innerHTML = state.categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+    }
 
     // Populate POS Category Pills
     renderPosCategoryPills();
   } catch (err) {
     console.error('Failed to load categories:', err);
+    if (!Array.isArray(state.categories)) state.categories = [];
+    renderPosCategoryPills();
   }
 }
 
 function renderPosCategoryPills() {
   const container = document.getElementById('posCategoryPills');
+  if (!container) return;
   let html = `
     <button onclick="filterPosCatalog('all')" class="cat-pill ${state.posFilter === 'all' ? 'active bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'} px-3 py-1.5 rounded-full font-medium whitespace-nowrap">
       All Items
@@ -261,7 +268,7 @@ function renderPosCategoryPills() {
     </button>
   `;
 
-  state.categories.forEach(cat => {
+  (state.categories || []).forEach(cat => {
     const active = String(state.posFilter) === String(cat.id);
     html += `
       <button onclick="filterPosCatalog('${cat.id}')" class="cat-pill ${active ? 'active bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'} px-3 py-1.5 rounded-full font-medium whitespace-nowrap">
@@ -418,12 +425,13 @@ function renderPosCatalog() {
 }
 
 function handleCatalogItemClick(id, type) {
-  const item = state.posCatalog.find(i => String(i.id) === String(id) && (type ? i.type === type : true)) ||
-               state.posCatalog.find(i => String(i.id) === String(id) || String(i.code) === String(id));
+  const catalog = state.posCatalog || [];
+  const item = catalog.find(i => String(i.id) === String(id) && (type ? i.type === type : true)) ||
+               catalog.find(i => String(i.id) === String(id) || String(i.code) === String(id));
   if (item) {
     addToCart(item);
   } else {
-    console.warn('Item not found in posCatalog for id:', id, 'type:', type, state.posCatalog);
+    console.warn('Item not found in posCatalog for id:', id, 'type:', type, catalog);
   }
 }
 
@@ -869,7 +877,8 @@ async function submitCheckout(printReceipt = false) {
     updateOutOfStockBadge();
 
     // Render receipt
-    renderReceipt(data);
+    const receiptOrder = (data && data.order) ? { ...data.order, ...data } : data;
+    renderReceipt(receiptOrder);
     openModal('modalReceipt');
 
     if (printReceipt) {
@@ -886,23 +895,29 @@ async function submitCheckout(printReceipt = false) {
    THERMAL RECEIPT GENERATOR (80mm)
 ========================================================= */
 function renderReceipt(order) {
+  if (!order) return;
+  if (order.order) {
+    order = { ...order.order, ...order };
+  }
   state.currentReceiptOrder = order;
   state.currentReceiptPayment = null;
   const container = document.getElementById('receiptPrintArea');
-  const dateFormatted = new Date(order.created_at).toLocaleString();
+  if (!container) return;
+  const dateFormatted = order.created_at ? new Date(order.created_at).toLocaleString() : new Date().toLocaleString();
 
   let itemsHtml = '';
-  order.items.forEach(item => {
-    const isPhone = item.item_type === 'phone';
+  const orderItems = Array.isArray(order.items) ? order.items : [];
+  orderItems.forEach(item => {
+    const isPhone = item.item_type === 'phone' || !!item.imei_number;
     itemsHtml += `
       <div style="margin-bottom: 6px;">
         <div style="display: flex; justify-content: space-between;">
-          <span style="font-weight: bold;">${item.title}</span>
+          <span style="font-weight: bold;">${item.title || item.name || 'Product'}</span>
         </div>
-        ${isPhone ? `<div style="font-size: 10px; color: #333;">★ IMEI: ${item.sku_or_imei}</div>` : ''}
+        ${isPhone ? `<div style="font-size: 10px; color: #333;">★ IMEI: ${item.sku_or_imei || item.code || item.imei_number}</div>` : ''}
         <div style="display: flex; justify-content: space-between; font-size: 11px; color: #444;">
-          <span>${item.quantity} x ${formatMoney(item.unit_price)}</span>
-          <span>${formatMoney(item.total_price)}</span>
+          <span>${item.quantity || 1} x ${formatMoney(item.unit_price || item.selling_price || 0)}</span>
+          <span>${formatMoney(item.total_price || ((item.unit_price || item.selling_price || 0) * (item.quantity || 1)))}</span>
         </div>
       </div>
     `;

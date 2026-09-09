@@ -143,7 +143,7 @@ const FirebaseDB = {
     if (!this.db) return;
 
     // Clean up existing listeners if any
-    this.unsubscribers.forEach(unsub => {
+    (this.unsubscribers || []).forEach(unsub => {
       try { unsub(); } catch (_) {}
     });
     this.unsubscribers = [];
@@ -229,7 +229,7 @@ const FirebaseDB = {
   },
 
   _notifyListeners(type, data) {
-    this.listeners.forEach(cb => {
+    (this.listeners || []).forEach(cb => {
       try { cb(type, data); } catch (e) { console.error('Listener callback error:', e); }
     });
   },
@@ -393,6 +393,7 @@ const FirebaseDB = {
       transaction.set(orderRef, cleanOrder);
 
       return {
+        ...cleanOrder,
         order_id: invoiceNumber,
         invoice_number: invoiceNumber,
         order: cleanOrder

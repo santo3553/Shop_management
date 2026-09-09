@@ -66,7 +66,8 @@ const MobileDB = {
 
   // --- CATEGORIES ---
   getCategories() {
-    return this._get(this.KEYS.CATEGORIES);
+    const cats = this._get(this.KEYS.CATEGORIES);
+    return Array.isArray(cats) ? cats : [];
   },
 
   saveCategory(name) {
@@ -86,9 +87,9 @@ const MobileDB = {
     let items = this._get(this.KEYS.ITEMS);
     const categories = this.getCategories();
     const catMap = {};
-    categories.forEach(c => catMap[c.id] = c.name);
+    (categories || []).forEach(c => catMap[c.id] = c.name);
 
-    items = items.map(i => ({
+    items = (items || []).map(i => ({
       ...i,
       category_name: catMap[i.category_id] || 'General'
     }));
@@ -509,7 +510,7 @@ const MobileDB = {
     let itemsSold = 0;
     const accSalesMap = {};
 
-    monthOrders.forEach(o => {
+    (monthOrders || []).forEach(o => {
       (o.items || []).forEach(it => {
         itemsSold += it.quantity;
         if (it.item_type === 'accessory') {

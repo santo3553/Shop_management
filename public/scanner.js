@@ -1,4 +1,4 @@
-﻿/* =========================================================
+/* =========================================================
    BIPLOB SHOP - MOBILE CAMERA BARCODE & IMEI SCANNER
    Uses HTML5 MediaDevices & BarcodeDetector API for fast
    camera scanning on Android phones and tablets.
@@ -103,7 +103,9 @@ const CameraScanner = {
       this.track = null;
     }
     if (this.stream) {
-      this.stream.getTracks().forEach(t => t.stop());
+      if (typeof this.stream.getTracks === 'function') {
+        (this.stream.getTracks() || []).forEach(t => t.stop());
+      }
       this.stream = null;
     }
     if (this.videoEl) {
