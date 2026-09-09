@@ -142,8 +142,10 @@ const FirebaseDB = {
     });
     this.unsubscribers = [];
 
+    let hasCheckedAutoMigrate = false;
+
     // 1. Sync Accessories (items collection)
-    const unsubItems = this.db.collection('items').onSnapshot((snapshot) => {
+    const unsubItems = this.db.collection('items').onSnapshot(async (snapshot) => {
       const items = [];
       snapshot.forEach(doc => {
         items.push({ id: doc.id, ...doc.data() });
@@ -152,6 +154,22 @@ const FirebaseDB = {
       this.syncState = snapshot.metadata.fromCache ? (navigator.onLine ? 'connected' : 'offline') : 'connected';
       this._updateStatusUI();
       this._notifyListeners('items', items);
+
+      // Auto-upload local products if Firestore is fresh/empty
+      if (!hasCheckedAutoMigrate && snapshot.empty && window.MobileDB) {
+        hasCheckedAutoMigrate = true;
+        const localItems = window.MobileDB._get(window.MobileDB.KEYS.ITEMS);
+        const localPhones = window.MobileDB._get(window.MobileDB.KEYS.PHONES);
+        if ((localItems && localItems.length > 0) || (localPhones && localPhones.length > 0)) {
+          console.log('[FirebaseDB] Fresh cloud database detected. Auto-uploading local inventory...');
+          try {
+            await this.migrateFromLocalDB();
+            console.log('[FirebaseDB] Auto-upload complete!');
+          } catch (mErr) {
+            console.warn('[FirebaseDB] Auto-upload note:', mErr);
+          }
+        }
+      }
     }, (err) => {
       console.warn('Firestore items sync notice:', err);
     });
@@ -568,28 +586,46 @@ const FirebaseDB = {
     });
   },
 
-  // --- LOCAL TO CLOUD MIGRATION (1-Click Helper) ---
+  // --- LOCAL TO CLOUD MIGRATION (1-Click Helper & Auto-Upload) ---
   async migrateFromLocalDB() {
     if (!this.isConfigured()) throw new Error('Connect Firebase first before migrating.');
     if (!window.MobileDB) throw new Error('No local database found.');
 
-    const localItems = MobileDB._get(MobileDB.KEYS.ITEMS);
-    const localPhones = MobileDB._get(MobileDB.KEYS.PHONES);
-    const localCats = MobileDB.getCategories();
-    const localOrders = MobileDB._get(MobileDB.KEYS.ORDERS);
+    const localItems = window.MobileDB._get(window.MobileDB.KEYS.ITEMS) || [];
+    const localPhones = window.MobileDB._get(window.MobileDB.KEYS.PHONES) || [];
+    const localCats = window.MobileDB.getCategories() || [];
+    const localOrders = window.MobileDB._get(window.MobileDB.KEYS.ORDERS) || [];
 
     let count = 0;
     const batch = this.db.batch();
 
     // 1. Categories
     if (localCats.length) {
-      batch.set(this.db.collection('config').doc('categories'), { list: localCats });
+      batch.set(this.db.collection('config').doc('categories'), { list: localCats }, { merge: true });
     }
 
     // 2. Accessories
     for (const item of localItems) {
-      const ref = this.db.collection('items').doc(String(item.id || Date.now()));
-      batch.set(ref, item, { merge: true });
+      const docId = String(item.id || Date.now());
+      const cleanImg = item.image || item.image_url || '';
+      const cleanItem = {
+        id: docId,
+        sku_or_barcode: (item.sku_or_barcode || '').trim(),
+        title: (item.title || '').trim(),
+        category_id: item.category_id || '',
+        category_name: item.category_name || 'General',
+        cost_price: Number(item.cost_price || 0),
+        selling_price: Number(item.selling_price || 0),
+        stock_quantity: Number(item.stock_quantity || 0),
+        min_alert_threshold: Number(item.min_alert_threshold || 5),
+        rack_location: (item.rack_location || '-').trim(),
+        image: cleanImg,
+        image_url: cleanImg,
+        is_active: 1,
+        created_at: item.created_at || new Date().toISOString()
+      };
+      const ref = this.db.collection('items').doc(docId);
+      batch.set(ref, cleanItem, { merge: true });
       count++;
     }
 
@@ -597,8 +633,26 @@ const FirebaseDB = {
     for (const phone of localPhones) {
       const imei = String(phone.imei_number || phone.id).trim();
       if (imei) {
+        const cleanImg = phone.image || phone.image_url || '';
+        const cleanPhone = {
+          id: imei,
+          imei_number: imei,
+          brand: (phone.brand || '').trim(),
+          model: (phone.model || '').trim(),
+          storage_capacity: (phone.storage_capacity || '').trim(),
+          color: (phone.color || '').trim(),
+          condition_grade: phone.condition_grade || 'Brand New (Official)',
+          battery_health: Number(phone.battery_health || 100),
+          warranty_type: phone.warranty_type || 'Official 1-Year',
+          purchase_cost: Number(phone.purchase_cost || 0),
+          selling_price: Number(phone.selling_price || 0),
+          status: phone.status || 'In-Stock',
+          image: cleanImg,
+          image_url: cleanImg,
+          created_at: phone.created_at || new Date().toISOString()
+        };
         const ref = this.db.collection('phones').doc(imei);
-        batch.set(ref, phone, { merge: true });
+        batch.set(ref, cleanPhone, { merge: true });
         count++;
       }
     }
@@ -611,7 +665,9 @@ const FirebaseDB = {
       count++;
     }
 
-    await batch.commit();
+    if (count > 0 || localCats.length > 0) {
+      await batch.commit();
+    }
     return { migratedCount: count };
   },
 
