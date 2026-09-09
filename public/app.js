@@ -98,6 +98,10 @@ function closeModal(id) {
   }
 }
 
+function openFabQuickActions() {
+  openModal('modalFabActions');
+}
+
 // Auto-dismiss dialog when clicking on backdrop
 document.addEventListener('click', (e) => {
   if (e.target && e.target.tagName === 'DIALOG' && e.target.hasAttribute('open')) {
@@ -138,28 +142,40 @@ async function switchTab(tabName) {
 
   state.activeTab = tabName;
 
-  // Update nav buttons
+  // Update dynamic header subtitle
+  const subTitleEl = document.getElementById('appHeaderSubtitle');
+  if (subTitleEl) {
+    const subtitles = {
+      pos: 'Checkout • Terminal 01',
+      inventory: 'Inventory • Safe A/B',
+      orders: 'Sales & Invoices • Register 01',
+      reports: 'Business Reports • Analytics'
+    };
+    subTitleEl.textContent = subtitles[tabName] || 'POS Terminal';
+  }
+
+  // Update desktop nav buttons
   document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.classList.remove('active', 'bg-indigo-800', 'text-white');
-    btn.classList.add('text-indigo-200');
+    btn.classList.remove('active', 'text-blue-600', 'font-bold');
+    btn.classList.add('text-gray-500', 'font-medium');
   });
 
   const activeBtn = document.getElementById(`tabBtn-${tabName}`);
   if (activeBtn) {
-    activeBtn.classList.add('active', 'text-white');
-    activeBtn.classList.remove('text-indigo-200');
+    activeBtn.classList.add('active', 'text-blue-600', 'font-bold');
+    activeBtn.classList.remove('text-gray-500', 'font-medium');
   }
 
-  // Update mobile nav buttons
+  // Update mobile bottom nav buttons
   document.querySelectorAll('.mob-tab-btn').forEach(btn => {
-    btn.classList.remove('text-white', 'bg-indigo-900', 'font-bold');
-    btn.classList.add('text-indigo-300', 'font-medium');
+    btn.classList.remove('text-blue-600', 'font-bold');
+    btn.classList.add('text-gray-400', 'hover:text-blue-600', 'font-medium');
   });
 
   const activeMobBtn = document.getElementById(`mobTab-${tabName}`);
   if (activeMobBtn) {
-    activeMobBtn.classList.add('text-white', 'bg-indigo-900', 'font-bold');
-    activeMobBtn.classList.remove('text-indigo-300', 'font-medium');
+    activeMobBtn.classList.remove('text-gray-400', 'hover:text-blue-600', 'font-medium');
+    activeMobBtn.classList.add('text-blue-600', 'font-bold');
   }
 
   // Update view panes
@@ -270,10 +286,10 @@ function renderPosCategoryPills() {
   const container = document.getElementById('posCategoryPills');
   if (!container) return;
   let html = `
-    <button onclick="filterPosCatalog('all')" class="cat-pill ${state.posFilter === 'all' ? 'active bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'} px-3 py-1.5 rounded-full font-medium whitespace-nowrap">
+    <button onclick="filterPosCatalog('all')" class="cat-pill ${state.posFilter === 'all' ? 'active bg-blue-600 text-white font-bold' : 'bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium'} px-3.5 py-1.5 rounded-full text-xs whitespace-nowrap transition">
       All Items
     </button>
-    <button onclick="filterPosCatalog('phone')" class="cat-pill ${state.posFilter === 'phone' ? 'active bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'} px-3 py-1.5 rounded-full font-medium whitespace-nowrap flex items-center space-x-1">
+    <button onclick="filterPosCatalog('phone')" class="cat-pill ${state.posFilter === 'phone' ? 'active bg-blue-600 text-white font-bold' : 'bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium'} px-3.5 py-1.5 rounded-full text-xs whitespace-nowrap flex items-center space-x-1 transition">
       <span>📱 Mobile Handsets</span>
     </button>
   `;
@@ -281,7 +297,7 @@ function renderPosCategoryPills() {
   (state.categories || []).forEach(cat => {
     const active = String(state.posFilter) === String(cat.id);
     html += `
-      <button onclick="filterPosCatalog('${cat.id}')" class="cat-pill ${active ? 'active bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'} px-3 py-1.5 rounded-full font-medium whitespace-nowrap">
+      <button onclick="filterPosCatalog('${cat.id}')" class="cat-pill ${active ? 'active bg-blue-600 text-white font-bold' : 'bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium'} px-3.5 py-1.5 rounded-full text-xs whitespace-nowrap transition">
         ${cat.name}
       </button>
     `;
@@ -372,28 +388,28 @@ function renderPosCatalog() {
       const isBrandNew = item.condition_grade && item.condition_grade.includes('Brand New');
       if (isBrandNew) {
         badge = `
-          <span class="inline-flex items-center text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-blue-100 text-blue-800">
+          <span class="inline-flex items-center text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">
             ✨ Brand New
           </span>
-          <span class="inline-flex items-center text-[10px] font-semibold text-gray-600 bg-gray-100 px-1.5 py-0.5 rounded" title="${item.warranty_type || 'Official 1-Year'}">
+          <span class="inline-flex items-center text-[10px] font-semibold text-gray-600 bg-gray-100 px-1.5 py-0.5 rounded-full" title="${item.warranty_type || 'Official 1-Year'}">
             🛡️ ${item.warranty_type ? item.warranty_type.replace('Brand Warranty', 'Warranty').replace('Shop Service Warranty', 'Shop').slice(0, 16) : '1-Yr'}
           </span>
         `;
       } else {
         const gradeColor = item.condition_grade.includes('A') ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800';
         badge = `
-          <span class="inline-flex items-center text-[10px] font-bold px-1.5 py-0.5 rounded ${gradeColor}">
+          <span class="inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full ${gradeColor}">
             ${item.condition_grade}
           </span>
-          <span class="inline-flex items-center text-[10px] font-semibold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
+          <span class="inline-flex items-center text-[10px] font-semibold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded-full">
             🔋 ${item.battery_health}%
           </span>
         `;
       }
     } else {
       badge = `
-        <span class="text-[11px] font-medium ${item.stock_quantity <= 5 ? 'text-red-600 font-bold' : 'text-gray-500'}">
-          Stock: ${item.stock_quantity}
+        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${item.stock_quantity <= 3 ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'}">
+          ${item.stock_quantity <= 0 ? 'Out of stock' : `Stock: ${item.stock_quantity}`}
         </span>
       `;
     }
@@ -401,31 +417,37 @@ function renderPosCatalog() {
     return `
       <div
         onclick="handleCatalogItemClick('${item.id}', '${item.type}')"
-        class="bg-white border rounded-lg p-3 cursor-pointer hover:border-indigo-500 hover:shadow transition relative flex flex-col justify-between ${isOutOfStock ? 'opacity-50 pointer-events-none bg-gray-50' : 'border-gray-200'}"
+        class="modern-card p-3.5 cursor-pointer hover:border-blue-500 hover:shadow-md transition relative flex flex-col justify-between active:scale-[0.99] ${isOutOfStock ? 'opacity-50 pointer-events-none bg-gray-50' : 'bg-white'}"
       >
         <div>
-          <div class="flex items-start justify-between gap-1 mb-1.5">
-            <span class="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-gray-100 text-gray-700">
+          <div class="flex items-start justify-between gap-1 mb-2">
+            <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-gray-100 text-gray-700">
               ${item.code}
             </span>
             <div class="flex items-center space-x-1">
               ${badge}
             </div>
           </div>
-          <div class="flex items-center space-x-2.5">
+          <div class="flex items-center space-x-3 my-1">
             ${item.image ? `
-              <img src="${item.image}" alt="" class="w-11 h-11 rounded-lg object-cover border border-gray-200 flex-shrink-0 shadow-xs">
+              <img src="${item.image}" alt="" class="w-12 h-12 rounded-xl object-cover border border-gray-100 flex-shrink-0 shadow-xs">
             ` : `
-              <div class="w-11 h-11 rounded-lg bg-gray-100 border border-gray-200 flex items-center justify-center text-base flex-shrink-0 text-gray-400">
+              <div class="w-12 h-12 rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center text-xl flex-shrink-0 text-gray-400">
                 ${isPhone ? '📱' : '📦'}
               </div>
             `}
-            <h4 class="font-bold text-gray-800 text-xs line-clamp-2 leading-snug">${item.title}</h4>
+            <div class="flex-1 min-w-0">
+              <h4 class="font-bold text-gray-900 text-xs sm:text-sm line-clamp-2 leading-snug">${item.title}</h4>
+              ${item.rack_location ? `<span class="tag-location mt-1 inline-block">📍 ${item.rack_location}</span>` : ''}
+            </div>
           </div>
         </div>
-        <div class="mt-2.5 pt-2 border-t border-gray-100 flex items-center justify-between">
-          <span class="font-extrabold text-indigo-700 text-sm">${formatMoney(item.selling_price)}</span>
-          <button type="button" onclick="event.stopPropagation(); handleCatalogItemClick('${item.id}', '${item.type}')" class="bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white text-xs font-bold px-2 py-1 rounded transition flex items-center space-x-1 cursor-pointer">
+        <div class="mt-3 pt-2.5 border-t border-gray-100 flex items-center justify-between">
+          <div>
+            <span class="text-[10px] text-gray-400 block font-medium">Price</span>
+            <span class="font-black text-blue-600 text-sm sm:text-base">${formatMoney(item.selling_price)}</span>
+          </div>
+          <button type="button" onclick="event.stopPropagation(); handleCatalogItemClick('${item.id}', '${item.type}')" class="bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs font-bold px-3 py-1.5 rounded-xl transition flex items-center space-x-1 shadow-sm cursor-pointer active:scale-95">
             <span>+ Add</span>
           </button>
         </div>
@@ -654,20 +676,20 @@ function renderCart() {
 
         <div class="flex items-center space-x-2">
           ${isPhone ? `
-            <span class="text-xs font-bold text-gray-500 px-2 py-1 bg-gray-100 rounded">1 unit</span>
+            <span class="text-xs font-bold text-gray-500 px-2 py-1 bg-gray-100 rounded-lg">1 unit</span>
           ` : `
-            <div class="flex items-center border border-gray-300 rounded bg-white">
-              <button onclick="updateCartQuantity(${index}, -1)" class="px-2 py-0.5 text-gray-600 hover:bg-gray-100 font-bold">-</button>
-              <span class="px-2 py-0.5 font-bold text-gray-800 min-w-[20px] text-center">${item.quantity}</span>
-              <button onclick="updateCartQuantity(${index}, 1)" class="px-2 py-0.5 text-gray-600 hover:bg-gray-100 font-bold">+</button>
+            <div class="flex items-center space-x-1 bg-gray-50 p-0.5 rounded-lg border border-gray-200">
+              <button onclick="updateCartQuantity(${index}, -1)" class="stepper-btn text-gray-700 font-bold" title="Decrease">−</button>
+              <span class="w-6 text-center font-bold text-gray-800 text-xs">${item.quantity}</span>
+              <button onclick="updateCartQuantity(${index}, 1)" class="stepper-btn text-gray-700 font-bold" title="Increase">+</button>
             </div>
           `}
 
-          <div class="text-right min-w-[65px]">
-            <span class="font-bold text-gray-900">${formatMoney(lineTotal)}</span>
+          <div class="text-right min-w-[70px]">
+            <span class="font-extrabold text-blue-600 text-xs sm:text-sm">${formatMoney(lineTotal)}</span>
           </div>
 
-          <button onclick="removeFromCart(${index})" class="text-gray-400 hover:text-red-600 p-1 transition" title="Remove">
+          <button onclick="removeFromCart(${index})" class="w-7 h-7 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 flex items-center justify-center transition" title="Remove">
             ✕
           </button>
         </div>
@@ -1473,52 +1495,63 @@ async function loadAccessoriesTable() {
     tbody.innerHTML = displayItems.map(item => {
       const isZero = Number(item.stock_quantity) <= 0;
       const isLow = Number(item.stock_quantity) <= Number(item.min_alert_threshold);
+      const cost = Number(item.cost_price || 0);
+      const price = Number(item.selling_price || 0);
+      const profit = price - cost;
+      const marginPct = cost > 0 ? Math.round((profit / cost) * 100) : 0;
+
       return `
-        <tr class="hover:bg-gray-50 ${isZero ? 'bg-red-50/50' : isLow ? 'bg-amber-50/40' : ''}">
-          <td class="px-4 py-3 font-mono font-semibold text-gray-800">${item.sku_or_barcode}</td>
+        <tr class="hover:bg-gray-50 transition ${isZero ? 'bg-red-50/40' : isLow ? 'bg-amber-50/30' : ''}">
+          <td class="px-4 py-3 font-mono font-bold text-gray-700">${item.sku_or_barcode}</td>
           <td class="px-4 py-3">
-            <div class="flex items-center space-x-2.5">
-              ${item.image ? `<img src="${item.image}" alt="" class="w-8 h-8 rounded-lg object-cover border border-gray-200 flex-shrink-0 shadow-xs">` : `<div class="w-8 h-8 rounded-lg bg-gray-100 border border-gray-200 flex items-center justify-center text-xs flex-shrink-0 text-gray-400">📦</div>`}
-              <span class="font-bold text-gray-900">${item.title}</span>
+            <div class="flex items-center space-x-3">
+              ${item.image ? `<img src="${item.image}" alt="" class="w-9 h-9 rounded-xl object-cover border border-gray-200 flex-shrink-0 shadow-xs">` : `<div class="w-9 h-9 rounded-xl bg-gray-100 border border-gray-200 flex items-center justify-center text-sm flex-shrink-0 text-gray-400">📦</div>`}
+              <div>
+                <span class="font-bold text-gray-900 block leading-tight">${item.title}</span>
+                <span class="text-[10px] text-gray-400 block">${item.category_name || 'General'}</span>
+              </div>
             </div>
           </td>
-          <td class="px-4 py-3 text-gray-600">${item.category_name || 'General'}</td>
+          <td class="px-4 py-3 text-gray-600 font-medium">${item.category_name || 'General'}</td>
           <td class="px-4 py-3">
             ${item.rack_location ? `
-              <span class="inline-flex items-center px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-100 font-mono text-[11px] font-semibold">
+              <span class="tag-location">
                 📍 ${item.rack_location}
               </span>
             ` : `<span class="text-gray-400 italic text-[11px]">-</span>`}
           </td>
-          <td class="px-4 py-3 text-right text-gray-600 owner-only-stat">${formatMoney(item.cost_price)}</td>
-          <td class="px-4 py-3 text-right font-bold text-gray-900">${formatMoney(item.selling_price)}</td>
+          <td class="px-4 py-3 text-right text-gray-500 font-medium owner-only-stat">${formatMoney(item.cost_price)}</td>
+          <td class="px-4 py-3 text-right">
+            <span class="font-bold text-gray-900 block">${formatMoney(item.selling_price)}</span>
+            <span class="text-[10px] text-emerald-600 font-bold block owner-only-stat">+${marginPct}%</span>
+          </td>
           <td class="px-4 py-3 text-center">
-            <div class="inline-flex items-center space-x-1.5">
-              <button onclick="quickAdjustStock('${item.id}', -1)" class="w-5 h-5 rounded bg-gray-200 text-gray-700 hover:bg-red-200 font-bold text-xs flex items-center justify-center">-</button>
-              <span class="font-extrabold px-1.5 ${isZero ? 'text-red-600' : isLow ? 'text-amber-600' : 'text-gray-900'}">${item.stock_quantity}</span>
-              <button onclick="quickAdjustStock('${item.id}', 1)" class="w-5 h-5 rounded bg-gray-200 text-gray-700 hover:bg-emerald-200 font-bold text-xs flex items-center justify-center">+</button>
+            <div class="inline-flex items-center space-x-1 bg-gray-50 p-1 rounded-lg border border-gray-200">
+              <button onclick="quickAdjustStock('${item.id}', -1)" class="stepper-btn text-gray-700 font-bold" title="Decrease">−</button>
+              <span class="w-6 text-center font-extrabold text-xs ${isZero ? 'text-red-600' : isLow ? 'text-amber-600' : 'text-gray-900'}">${item.stock_quantity}</span>
+              <button onclick="quickAdjustStock('${item.id}', 1)" class="stepper-btn text-gray-700 font-bold" title="Increase">+</button>
             </div>
           </td>
-          <td class="px-4 py-3 text-center text-gray-500">${item.min_alert_threshold}</td>
+          <td class="px-4 py-3 text-center text-gray-400 font-mono text-xs">${item.min_alert_threshold}</td>
           <td class="px-4 py-3 text-center">
             ${isZero ? `
-              <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-extrabold bg-red-100 text-red-700 border border-red-200">
+              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-red-100 text-red-700 border border-red-200">
                 ⚠️ Out of Stock (0)
               </span>
             ` : isLow ? `
-              <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-extrabold bg-amber-100 text-amber-800 border border-amber-200">
+              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-800 border border-amber-200">
                 ⚠️ Low (${item.stock_quantity})
               </span>
             ` : `
-              <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800">
+              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
                 In-Stock
               </span>
             `}
           </td>
-          <td class="px-4 py-3 text-right space-x-1">
-            <button onclick="openEditItemModal('${item.id}')" class="text-indigo-600 hover:text-indigo-900 font-semibold text-xs">Edit</button>
+          <td class="px-4 py-3 text-right space-x-2">
+            <button onclick="openEditItemModal('${item.id}')" class="text-blue-600 hover:text-blue-800 font-bold text-xs transition">Edit</button>
             <span class="text-gray-300">|</span>
-            <button onclick="deleteItem('${item.id}')" class="text-red-600 hover:text-red-800 font-semibold text-xs">Del</button>
+            <button onclick="deleteItem('${item.id}')" class="text-red-600 hover:text-red-800 font-bold text-xs transition">Del</button>
           </td>
         </tr>
       `;
@@ -2241,6 +2274,20 @@ async function loadOrdersTable() {
   try {
     const res = await fetch(url);
     const orders = await res.json();
+
+    // Calculate Today's KPI metrics for #ordersTodaySummaryCard (Mockup 4)
+    const todayStr = new Date().toISOString().split('T')[0];
+    const todayOrders = Array.isArray(orders) ? orders.filter(o => o.created_at && o.created_at.startsWith(todayStr) && o.status !== 'VOID') : [];
+    const todayGross = todayOrders.reduce((sum, o) => sum + (parseFloat(o.total_amount || o.final_amount || 0)), 0);
+    const todayProfit = todayOrders.reduce((sum, o) => sum + (parseFloat(o.profit_margin || 0)), 0);
+
+    const kpiGrossEl = document.getElementById('kpiTodayGross');
+    const kpiProfitEl = document.getElementById('kpiTodayProfit');
+    const kpiCountEl = document.getElementById('kpiTodayCount');
+    if (kpiGrossEl) kpiGrossEl.textContent = formatMoney(todayGross);
+    if (kpiProfitEl) kpiProfitEl.textContent = formatMoney(todayProfit);
+    if (kpiCountEl) kpiCountEl.textContent = `${todayOrders.length} Invoice${todayOrders.length === 1 ? '' : 's'}`;
+
     const tbody = document.getElementById('ordersTableBody');
 
     if (orders.length === 0) {

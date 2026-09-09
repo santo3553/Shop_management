@@ -93,91 +93,43 @@
     </div>
   </div>
 
-  <!-- TOP APP BAR -->
-  <header class="app-header bg-indigo-900 text-white shadow-md sticky top-0 z-40">
+  <!-- TOP APP BAR (Modern Light Theme) -->
+  <header class="app-header bg-white text-gray-900 border-b border-gray-200 sticky top-0 z-40 shadow-xs">
     <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
-      <div class="flex items-center justify-between min-h-[56px] sm:min-h-[64px] py-1.5 sm:py-2">
+      <div class="flex items-center justify-between min-h-[56px] sm:min-h-[64px] py-2">
         
-        <!-- BRAND LOGO & INFO -->
+        <!-- BRAND LOGO & DYNAMIC INFO -->
         <div class="flex items-center space-x-2.5 sm:space-x-3 min-w-0">
-          <img src="logo.png" class="w-9 h-9 sm:w-10 sm:h-10 rounded-lg object-contain bg-black shadow-md border border-indigo-700/60 p-0.5 flex-shrink-0" alt="MDT Logo">
+          <div class="w-10 h-10 rounded-xl bg-blue-600 text-white font-black flex items-center justify-center text-sm shadow-sm flex-shrink-0 tracking-wider">
+            MD
+          </div>
           <div class="min-w-0">
-            <div class="flex items-center space-x-2">
-              <h1 class="text-base sm:text-lg md:text-xl font-extrabold tracking-tight truncate whitespace-nowrap">Mobile Decor &amp; Tech</h1>
-              <span class="hidden md:inline-flex text-xs bg-indigo-700 text-indigo-200 px-2 py-0.5 rounded-full font-medium">Smartphones &amp; Accessories</span>
+            <div class="flex items-center space-x-1.5">
+              <h1 class="text-sm sm:text-base md:text-lg font-black tracking-tight text-gray-900 truncate">Mobile Decor &amp; Tech</h1>
+              <span class="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-bold border border-blue-100 flex-shrink-0">POS</span>
             </div>
-            <p class="hidden sm:block text-xs text-indigo-300">POS &amp; IMEI Inventory System</p>
+            <p id="appHeaderSubtitle" class="text-[11px] text-gray-500 font-medium truncate">Checkout • Terminal 01</p>
           </div>
         </div>
 
-        <!-- NAVIGATION TABS (Desktop / Tablet) -->
-        <nav class="hidden md:flex space-x-1" id="mainNav">
-          <button onclick="switchTab('pos')" id="tabBtn-pos" class="tab-btn active px-3 py-2 rounded-md text-sm font-semibold flex items-center space-x-1.5 transition">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
-            <span>POS Checkout</span>
-            <span class="kbd-hint">F2</span>
+        <!-- RIGHT CONTROLS: SYNCED BADGE & PROFILE/SECURITY BUTTON -->
+        <div class="flex items-center space-x-2 text-xs flex-shrink-0">
+          <button onclick="openCloudSyncModal()" id="cloudSyncBadge" class="flex items-center space-x-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 px-2.5 py-1 rounded-full border border-emerald-200 text-xs font-semibold cursor-pointer transition shadow-xs">
+            <span id="cloudSyncDot" class="w-2 h-2 rounded-full bg-emerald-500"></span>
+            <span id="cloudSyncText">Synced</span>
           </button>
-          <button onclick="switchTab('inventory')" id="tabBtn-inventory" class="tab-btn px-3 py-2 rounded-md text-sm font-medium flex items-center space-x-1.5 transition text-indigo-200 hover:text-white hover:bg-indigo-800">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
-            <span>Inventory</span>
-            <span class="kbd-hint">F3</span>
+          
+          <button onclick="openSecurityModal()" id="roleBadge" class="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700 flex items-center justify-center border border-gray-200 transition shadow-xs cursor-pointer" title="Security & Role Access">
+            <span class="text-sm">👤</span>
           </button>
-          <button onclick="switchTab('orders')" id="tabBtn-orders" class="tab-btn px-3 py-2 rounded-md text-sm font-medium flex items-center space-x-1.5 transition text-indigo-200 hover:text-white hover:bg-indigo-800">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-            <span>Invoices</span>
-          </button>
-          <button onclick="switchTab('reports')" id="tabBtn-reports" class="tab-btn px-3 py-2 rounded-md text-sm font-medium flex items-center space-x-1.5 transition text-indigo-200 hover:text-white hover:bg-indigo-800">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-            <span>Reports</span>
-            <span class="kbd-hint">F4</span>
-          </button>
-        </nav>
-
-        <!-- SECURITY ROLE, 1-TAP BACKUP & CLOUD SYNC -->
-        <div class="flex items-center space-x-1 sm:space-x-2 text-xs flex-shrink-0">
-          <button onclick="AuthSecurity.lockApp()" id="quickLockBtn" class="flex items-center space-x-1 bg-red-950/80 hover:bg-red-900 text-red-200 px-2 py-1 sm:px-2.5 sm:py-1 rounded-md border border-red-700/60 text-[11px] font-semibold cursor-pointer transition shadow-sm active:scale-95" title="Lock Terminal Immediately">
-            <span>🔒</span>
-            <span class="hidden sm:inline">Lock</span>
-          </button>
-          <button onclick="openSecurityModal()" id="roleBadge" class="flex items-center space-x-1.5 bg-indigo-950/70 text-indigo-200 px-2 py-1 sm:px-2.5 sm:py-1 rounded-md border border-indigo-700/50 text-[11px] font-semibold cursor-pointer hover:bg-indigo-900 transition shadow-sm" title="Click to unlock Owner View or lock to Staff Mode">
-            <span class="w-2 h-2 rounded-full bg-blue-400"></span>
-            <span>👤 Staff Mode</span>
-          </button>
-          <button onclick="triggerDailyBackup()" id="dailyBackupBtn" class="flex items-center space-x-1 bg-amber-600 hover:bg-amber-700 text-white font-bold px-2 py-1 rounded-md text-[11px] transition shadow-sm" title="Export encrypted daily backup to WhatsApp">
-            <span>💾 Backup</span>
-          </button>
-          <button onclick="openCloudSyncModal()" id="cloudSyncBadge" class="flex items-center space-x-1.5 bg-indigo-900/60 text-indigo-200 px-2.5 py-1 rounded-md border border-indigo-700/50 text-[11px] font-semibold cursor-pointer hover:bg-indigo-800 transition shadow-sm">
-            <span id="cloudSyncDot" class="w-2 h-2 rounded-full bg-gray-400"></span>
-            <span id="cloudSyncText">Local Mode</span>
-          </button>
-          <div class="hidden sm:flex items-center space-x-1.5 bg-emerald-900/60 text-emerald-300 px-2.5 py-1 rounded-md border border-emerald-700/40 text-[11px] whitespace-nowrap font-semibold">
-            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span>Offline Ready</span>
-          </div>
         </div>
 
       </div>
     </div>
-
-    <!-- Mobile Nav Bar (Phone Screens) -->
-    <div class="mobile-nav-bar md:hidden flex border-t border-indigo-800/80 bg-indigo-950 px-2 py-1 justify-around text-xs relative z-10">
-      <button onclick="switchTab('pos')" id="mobTab-pos" class="mob-tab-btn px-3 py-1.5 rounded-md font-bold text-white bg-indigo-900 flex flex-col items-center transition">
-        <span>POS</span>
-      </button>
-      <button onclick="switchTab('inventory')" id="mobTab-inventory" class="mob-tab-btn px-3 py-1.5 rounded-md font-medium text-indigo-300 flex flex-col items-center transition">
-        <span>Inventory</span>
-      </button>
-      <button onclick="switchTab('orders')" id="mobTab-orders" class="mob-tab-btn px-3 py-1.5 rounded-md font-medium text-indigo-300 flex flex-col items-center transition">
-        <span>Invoices</span>
-      </button>
-      <button onclick="switchTab('reports')" id="mobTab-reports" class="mob-tab-btn px-3 py-1.5 rounded-md font-medium text-indigo-300 flex flex-col items-center transition">
-        <span>Reports</span>
-      </button>
-    </div>
   </header>
 
   <!-- MAIN CONTENT CONTAINER -->
-  <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+  <main class="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-6 lg:p-8 pb-28 sm:pb-32">
 
     <!-- =========================================================
          TAB 1: POINT OF SALE (POS)
@@ -719,6 +671,27 @@
           <button onclick="exportSalesCsv()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold py-2 px-3 rounded-lg border border-gray-300 transition">
             Export Sales CSV
           </button>
+        </div>
+      </div>
+
+      <!-- TODAY'S TRANSACTIONS KPI SUMMARY CARD (MOCKUP 4) -->
+      <div id="ordersTodaySummaryCard" class="bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-xl p-4 shadow-sm flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <span class="text-xs font-semibold uppercase tracking-wider text-blue-100">Today's Performance</span>
+          <div class="flex items-baseline space-x-2 mt-1">
+            <span id="kpiTodayGross" class="text-2xl font-black">৳ 0</span>
+            <span class="text-xs text-blue-200">Gross Sales</span>
+          </div>
+        </div>
+        <div class="flex items-center space-x-6 text-xs">
+          <div class="owner-only-stat">
+            <span class="text-blue-200 block">Est. Net Profit</span>
+            <span id="kpiTodayProfit" class="text-base font-extrabold text-emerald-300">৳ 0</span>
+          </div>
+          <div>
+            <span class="text-blue-200 block">Invoices Paid</span>
+            <span id="kpiTodayCount" class="text-base font-extrabold text-white">0 Invoices</span>
+          </div>
         </div>
       </div>
 
@@ -1787,6 +1760,100 @@
         </button>
         <button type="button" onclick="executeRestoreBackup()" class="py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl shadow-md transition active:scale-95">
           Restore Data
+        </button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- =========================================================
+       BOTTOM NAVIGATION BAR (Modern Floating Light Bar with Center FAB)
+  ========================================================= -->
+  <nav id="bottomNavBar" class="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-gray-200/80 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] px-2 sm:px-6">
+    <div class="max-w-md sm:max-w-lg mx-auto flex items-center justify-between relative py-1">
+      
+      <!-- Tab 1: POS Sale -->
+      <button onclick="switchTab('pos')" id="mobTab-pos" class="mob-tab-btn flex-1 flex flex-col items-center justify-center py-1 text-blue-600 transition active:scale-95">
+        <svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+        <span class="text-[10px] font-bold">POS Sale</span>
+      </button>
+
+      <!-- Tab 2: Inventory -->
+      <button onclick="switchTab('inventory')" id="mobTab-inventory" class="mob-tab-btn flex-1 flex flex-col items-center justify-center py-1 text-gray-400 hover:text-blue-600 transition active:scale-95">
+        <svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+        <span class="text-[10px] font-medium">Inventory</span>
+      </button>
+
+      <!-- Center Floating Action Button (FAB) -->
+      <div class="flex-shrink-0 px-2">
+        <button onclick="openFabQuickActions()" id="fabQuickActionBtn" class="w-13 h-13 sm:w-14 sm:h-14 -mt-6 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg flex items-center justify-center border-4 border-white transition transform active:scale-90" title="Quick Actions">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Tab 3: Invoices -->
+      <button onclick="switchTab('orders')" id="mobTab-orders" class="mob-tab-btn flex-1 flex flex-col items-center justify-center py-1 text-gray-400 hover:text-blue-600 transition active:scale-95">
+        <svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        <span class="text-[10px] font-medium">Invoices</span>
+      </button>
+
+      <!-- Tab 4: Reports -->
+      <button onclick="switchTab('reports')" id="mobTab-reports" class="mob-tab-btn flex-1 flex flex-col items-center justify-center py-1 text-gray-400 hover:text-blue-600 transition active:scale-95">
+        <svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+        <span class="text-[10px] font-medium">Reports</span>
+      </button>
+
+    </div>
+  </nav>
+
+  <!-- FAB QUICK ACTIONS BOTTOM SHEET MODAL -->
+  <dialog id="modalFabActions" class="p-0 rounded-t-3xl sm:rounded-2xl shadow-2xl max-w-sm w-full bg-white backdrop:bg-black/60 overflow-hidden border border-gray-100 m-auto mt-auto sm:my-auto">
+    <div class="p-5 space-y-3">
+      <div class="flex items-center justify-between pb-2 border-b border-gray-100">
+        <div class="flex items-center space-x-2">
+          <div class="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-sm font-bold">
+            ⚡
+          </div>
+          <h3 class="font-bold text-gray-900 text-sm">Quick Action Menu</h3>
+        </div>
+        <button onclick="closeModal('modalFabActions')" class="text-gray-400 hover:text-gray-600 text-lg font-bold p-1">&times;</button>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2.5 pt-1">
+        <button onclick="closeModal('modalFabActions'); switchTab('pos'); document.getElementById('posSearchInput')?.focus();" class="p-3 rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-100 flex flex-col items-center text-center transition">
+          <span class="text-xl mb-1">🛒</span>
+          <span class="font-bold text-xs text-blue-900">New Sale</span>
+          <span class="text-[10px] text-blue-600">Open register</span>
+        </button>
+
+        <button onclick="closeModal('modalFabActions'); openAddItemModal();" class="p-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-100 flex flex-col items-center text-center transition">
+          <span class="text-xl mb-1">📦</span>
+          <span class="font-bold text-xs text-emerald-900">Add Item</span>
+          <span class="text-[10px] text-emerald-600">Accessories / Stock</span>
+        </button>
+
+        <button onclick="closeModal('modalFabActions'); openAddPhoneModal();" class="p-3 rounded-xl bg-purple-50 hover:bg-purple-100 border border-purple-100 flex flex-col items-center text-center transition">
+          <span class="text-xl mb-1">📱</span>
+          <span class="font-bold text-xs text-purple-900">Add Handset</span>
+          <span class="text-[10px] text-purple-600">IMEI Tracking</span>
+        </button>
+
+        <button onclick="closeModal('modalFabActions'); startCameraScanForPos();" class="p-3 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-100 flex flex-col items-center text-center transition">
+          <span class="text-xl mb-1">📷</span>
+          <span class="font-bold text-xs text-amber-900">Scan Barcode</span>
+          <span class="text-[10px] text-amber-600">Camera lookup</span>
+        </button>
+      </div>
+
+      <div class="pt-2 border-t border-gray-100 flex items-center justify-between text-xs">
+        <button onclick="closeModal('modalFabActions'); triggerDailyBackup();" class="text-gray-600 hover:text-blue-600 font-semibold flex items-center space-x-1 py-1">
+          <span>💾</span>
+          <span>1-Tap Daily Backup</span>
+        </button>
+        <button onclick="closeModal('modalFabActions'); AuthSecurity.lockApp();" class="text-red-600 hover:text-red-700 font-semibold flex items-center space-x-1 py-1">
+          <span>🔒</span>
+          <span>Lock App</span>
         </button>
       </div>
     </div>

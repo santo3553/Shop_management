@@ -548,17 +548,17 @@ const AuthSecurity = {
     if (badge) {
       if (this.isOwner()) {
         badge.innerHTML = `
-          <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
-          <span class="text-amber-200 font-bold">👑 Owner View</span>
+          <span class="text-sm">👑</span>
+          <span class="hidden sm:inline text-xs font-bold text-amber-800">Owner</span>
         `;
-        badge.className = 'flex items-center space-x-1.5 bg-amber-950/80 text-amber-200 px-2.5 py-1 rounded-md border border-amber-600/60 text-[11px] font-semibold cursor-pointer hover:bg-amber-900 transition shadow-sm';
+        badge.className = 'flex items-center space-x-1.5 bg-amber-50 text-amber-800 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full border border-amber-200 text-xs font-semibold cursor-pointer hover:bg-amber-100 transition shadow-xs active:scale-95';
         badge.title = 'Owner mode active. Click to lock to Staff Mode.';
       } else {
         badge.innerHTML = `
-          <span class="w-2 h-2 rounded-full bg-blue-400"></span>
-          <span class="text-indigo-200 font-medium">👤 Staff Mode</span>
+          <span class="text-sm">👤</span>
+          <span class="hidden sm:inline text-xs font-bold text-gray-700">Staff</span>
         `;
-        badge.className = 'flex items-center space-x-1.5 bg-indigo-950/70 text-indigo-200 px-2.5 py-1 rounded-md border border-indigo-700/50 text-[11px] font-semibold cursor-pointer hover:bg-indigo-900 transition shadow-sm';
+        badge.className = 'flex items-center space-x-1.5 bg-gray-100 text-gray-700 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full border border-gray-200 text-xs font-semibold cursor-pointer hover:bg-gray-200 transition shadow-xs active:scale-95';
         badge.title = 'Staff mode. Click to unlock Owner View with PIN.';
       }
     }
