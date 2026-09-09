@@ -142,14 +142,14 @@ async function switchTab(tabName) {
 
   state.activeTab = tabName;
 
-  // Update dynamic header subtitle
+  // Update dynamic header subtitle (concise to prevent truncation)
   const subTitleEl = document.getElementById('appHeaderSubtitle');
   if (subTitleEl) {
     const subtitles = {
-      pos: 'Checkout • Terminal 01',
-      inventory: 'Inventory • Safe A/B',
-      orders: 'Sales & Invoices • Register 01',
-      reports: 'Business Reports • Analytics'
+      pos: 'POS Terminal',
+      inventory: 'Inventory Stock',
+      orders: 'Sales & Invoices',
+      reports: 'Reports & Analytics'
     };
     subTitleEl.textContent = subtitles[tabName] || 'POS Terminal';
   }
@@ -170,12 +170,32 @@ async function switchTab(tabName) {
   document.querySelectorAll('.mob-tab-btn').forEach(btn => {
     btn.classList.remove('text-blue-600', 'font-bold');
     btn.classList.add('text-gray-400', 'hover:text-blue-600', 'font-medium');
+    const pill = btn.querySelector('.mob-tab-icon-pill');
+    if (pill) {
+      pill.classList.remove('bg-blue-50', 'text-blue-600');
+      pill.classList.add('text-gray-400');
+    }
+    const label = btn.querySelector('span');
+    if (label) {
+      label.classList.remove('font-bold', 'text-blue-600');
+      label.classList.add('font-medium', 'text-gray-400');
+    }
   });
 
   const activeMobBtn = document.getElementById(`mobTab-${tabName}`);
   if (activeMobBtn) {
     activeMobBtn.classList.remove('text-gray-400', 'hover:text-blue-600', 'font-medium');
     activeMobBtn.classList.add('text-blue-600', 'font-bold');
+    const pill = activeMobBtn.querySelector('.mob-tab-icon-pill');
+    if (pill) {
+      pill.classList.add('bg-blue-50', 'text-blue-600');
+      pill.classList.remove('text-gray-400');
+    }
+    const label = activeMobBtn.querySelector('span');
+    if (label) {
+      label.classList.remove('font-medium', 'text-gray-400');
+      label.classList.add('font-bold', 'text-blue-600');
+    }
   }
 
   // Update view panes
@@ -3096,13 +3116,13 @@ function updateSecurityUI(role) {
 
   if (roleBadge) {
     if (isOwner) {
-      roleBadge.className = 'px-2 py-1 rounded-lg text-xs font-black flex items-center space-x-1.5 transition active:scale-95 bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30';
-      if (roleText) roleText.textContent = 'Owner';
-      if (roleIcon) roleIcon.textContent = '👑';
+      roleBadge.className = 'w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-amber-50 hover:bg-amber-100 text-amber-800 flex items-center justify-center border border-amber-200 transition shadow-xs cursor-pointer flex-shrink-0 text-sm';
+      roleBadge.innerHTML = '👑';
+      roleBadge.title = 'Owner Mode (Active). Tap to manage security.';
     } else {
-      roleBadge.className = 'px-2 py-1 rounded-lg text-xs font-black flex items-center space-x-1.5 transition active:scale-95 bg-white/10 text-indigo-200 border border-white/15 hover:bg-white/20';
-      if (roleText) roleText.textContent = 'Staff';
-      if (roleIcon) roleIcon.textContent = '👤';
+      roleBadge.className = 'w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700 flex items-center justify-center border border-gray-200 transition shadow-xs cursor-pointer flex-shrink-0 text-sm';
+      roleBadge.innerHTML = '👤';
+      roleBadge.title = 'Staff Mode. Tap to enter Owner PIN.';
     }
   }
 

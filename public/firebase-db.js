@@ -118,20 +118,20 @@ const FirebaseDB = {
     if (!badge || !badgeText || !badgeDot) return;
 
     if (this.syncState === 'connected') {
-      badgeDot.className = 'w-2 h-2 rounded-full bg-emerald-400 animate-pulse';
-      badgeText.textContent = 'Cloud Synced';
+      badgeDot.className = 'w-2 h-2 rounded-full bg-emerald-500 animate-pulse';
+      badgeText.textContent = 'Synced';
       badge.title = 'Real-time multi-device cloud synchronization active (Firebase Spark Plan)';
-      badge.className = 'flex items-center space-x-1.5 bg-emerald-900/70 text-emerald-200 px-2.5 py-1 rounded-md border border-emerald-600/50 text-[11px] font-semibold cursor-pointer hover:bg-emerald-900 transition';
+      badge.className = 'flex items-center space-x-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 px-2 py-1 rounded-full border border-emerald-200 text-[11px] font-semibold cursor-pointer transition shadow-xs flex-shrink-0';
     } else if (this.syncState === 'offline') {
-      badgeDot.className = 'w-2 h-2 rounded-full bg-amber-400 animate-pulse';
-      badgeText.textContent = 'Offline (Queued)';
+      badgeDot.className = 'w-2 h-2 rounded-full bg-amber-500 animate-pulse';
+      badgeText.textContent = 'Offline';
       badge.title = 'Offline mode: changes will sync automatically when reconnected';
-      badge.className = 'flex items-center space-x-1.5 bg-amber-900/70 text-amber-200 px-2.5 py-1 rounded-md border border-amber-600/50 text-[11px] font-semibold cursor-pointer hover:bg-amber-900 transition';
+      badge.className = 'flex items-center space-x-1 bg-amber-50 text-amber-700 hover:bg-amber-100 px-2 py-1 rounded-full border border-amber-200 text-[11px] font-semibold cursor-pointer transition shadow-xs flex-shrink-0';
     } else {
       badgeDot.className = 'w-2 h-2 rounded-full bg-gray-400';
-      badgeText.textContent = 'Local Mode';
+      badgeText.textContent = 'Local';
       badge.title = 'Click to connect Firebase Cloud Sync for multi-phone sync';
-      badge.className = 'flex items-center space-x-1.5 bg-indigo-900/60 text-indigo-200 px-2.5 py-1 rounded-md border border-indigo-700/50 text-[11px] font-semibold cursor-pointer hover:bg-indigo-800 transition';
+      badge.className = 'flex items-center space-x-1 bg-gray-100 text-gray-700 hover:bg-gray-200 px-2 py-1 rounded-full border border-gray-200 text-[11px] font-semibold cursor-pointer transition shadow-xs flex-shrink-0';
     }
   },
 
