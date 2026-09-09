@@ -779,22 +779,8 @@ const FirebaseDB = {
         return this._json(await this.adjustStock(id, parseInt(parsedBody.delta, 10) || 0, parsedBody.reason));
       }
 
-      const itemMatch = pathname.match(/^\/api\/items\/([^/]+)$/);
-      if (itemMatch) {
-        const id = itemMatch[1];
-        if (method === 'GET') {
-          const found = this.cache.items.find(i => String(i.id) === String(id));
-          if (!found) return this._json({ error: 'Item not found' }, 404);
-          return this._json(found);
-        } else if (method === 'PUT') {
-          return this._json(await this.updateAccessory(id, parsedBody));
-        } else if (method === 'DELETE') {
-          return this._json(await this.deleteAccessory(id));
-        }
-      }
-
-      // 3. Out-of-Stock
-      if (pathname === '/api/items/out-of-stock') {
+      // 3. Out-of-Stock (Must be evaluated before /api/items/:id)
+      if (pathname === '/api/items/out-of-stock' || pathname === '/api/items/out-of-stock/') {
         const type = query.get('type') || 'all';
         const search = (query.get('search') || '').toLowerCase();
 
@@ -848,6 +834,20 @@ const FirebaseDB = {
           });
         }
         return this._json(combined);
+      }
+
+      const itemMatch = pathname.match(/^\/api\/items\/([^/]+)$/);
+      if (itemMatch && itemMatch[1] !== 'out-of-stock') {
+        const id = itemMatch[1];
+        if (method === 'GET') {
+          const found = this.cache.items.find(i => String(i.id) === String(id));
+          if (!found) return this._json({ error: 'Item not found' }, 404);
+          return this._json(found);
+        } else if (method === 'PUT') {
+          return this._json(await this.updateAccessory(id, parsedBody));
+        } else if (method === 'DELETE') {
+          return this._json(await this.deleteAccessory(id));
+        }
       }
 
       // 4. Phones (IMEI Handsets)
@@ -980,8 +980,35 @@ const FirebaseDB = {
           const res = await this.executeCheckout(cart, parsedBody);
           return this._json(res, 201);
         } else if (method === 'GET') {
-          return this._json(this.cache.orders);
+          const search = (query.get('search') || '').toLowerCase();
+          const isEmi = query.get('is_emi');
+          let orders = [...this.cache.orders];
+          if (isEmi === '1' || isEmi === 'true') {
+            orders = orders.filter(o => !!o.is_emi);
+          }
+          if (search) {
+            orders = orders.filter(o =>
+              (o.invoice_number && o.invoice_number.toLowerCase().includes(search)) ||
+              (o.customer_name && o.customer_name.toLowerCase().includes(search)) ||
+              (o.customer_phone && o.customer_phone.includes(search))
+            );
+          }
+          return this._json(orders);
         }
+      }
+
+      // 6b. Active EMI Orders
+      if (pathname === '/api/emi/orders' && method === 'GET') {
+        const search = (query.get('search') || '').toLowerCase();
+        let orders = this.cache.orders.filter(o => o.is_emi && (o.emi_type === 'Shop Installment' || !o.emi_type));
+        if (search) {
+          orders = orders.filter(o =>
+            (o.invoice_number && o.invoice_number.toLowerCase().includes(search)) ||
+            (o.customer_name && o.customer_name.toLowerCase().includes(search)) ||
+            (o.customer_phone && o.customer_phone.includes(search))
+          );
+        }
+        return this._json(orders);
       }
 
       const orderMatch = pathname.match(/^\/api\/orders\/([^/]+)$/);

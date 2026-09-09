@@ -1979,7 +1979,8 @@ async function loadOutOfStockTable() {
 
   try {
     const res = await fetch(queryUrl);
-    const items = await res.json();
+    const rawItems = await res.json();
+    const items = Array.isArray(rawItems) ? rawItems : [];
 
     if (totalPill) {
       totalPill.textContent = `${items.length} Product${items.length === 1 ? '' : 's'}`;
