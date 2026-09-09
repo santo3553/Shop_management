@@ -794,17 +794,29 @@ async function submitCheckout(printReceipt = false) {
   const discount = Math.max(0, parseFloat(document.getElementById('cartDiscountInput').value) || 0);
   const subtotal = state.cart.reduce((sum, i) => sum + (i.unit_price * i.quantity), 0);
   const total = Math.max(0, subtotal - discount);
+  const totalCost = state.cart.reduce((sum, i) => sum + ((parseFloat(i.unit_cost) || 0) * i.quantity), 0);
+  const profitMargin = total - totalCost;
 
   const payload = {
     customer_name: custName,
     customer_phone: custPhone,
     payment_method: state.paymentMethod,
-    discount,
+    subtotal: subtotal,
+    discount: discount,
+    discount_amount: discount,
+    final_amount: total,
+    total_amount: total,
+    total_cost: totalCost,
+    profit_margin: profitMargin,
+    paid_amount: total,
     items: state.cart.map(c => ({
       id: c.id,
+      item_id: c.id,
       item_type: c.type,
       quantity: c.quantity,
       unit_price: c.unit_price,
+      unit_cost: parseFloat(c.unit_cost) || 0,
+      total_price: c.unit_price * c.quantity,
       sku_or_imei: c.code,
       title: c.title
     }))
@@ -907,6 +919,15 @@ function renderReceipt(order) {
 
   let itemsHtml = '';
   const orderItems = Array.isArray(order.items) ? order.items : [];
+  const computedSubtotal = orderItems.reduce((acc, it) => acc + (parseFloat(it.selling_price || it.unit_price || 0) * (parseInt(it.quantity, 10) || 1)), 0);
+  const subtotalVal = (order.subtotal !== undefined && order.subtotal !== null && Number(order.subtotal) > 0)
+    ? parseFloat(order.subtotal)
+    : (computedSubtotal || parseFloat(order.total_amount || 0));
+  const discountVal = parseFloat(order.discount || order.discount_amount || 0);
+  const totalAmountVal = (order.total_amount !== undefined && order.total_amount !== null && Number(order.total_amount) > 0)
+    ? parseFloat(order.total_amount)
+    : (order.final_amount ? parseFloat(order.final_amount) : Math.max(0, subtotalVal - discountVal));
+
   orderItems.forEach(item => {
     const isPhone = item.item_type === 'phone' || !!item.imei_number;
     itemsHtml += `
@@ -1035,17 +1056,17 @@ function renderReceipt(order) {
     <div style="font-size: 11px; line-height: 1.5;">
       <div style="display: flex; justify-content: space-between;">
         <span>Subtotal:</span>
-        <span>${formatMoney(order.subtotal)}</span>
+        <span>${formatMoney(subtotalVal)}</span>
       </div>
-      ${order.discount > 0 ? `
+      ${discountVal > 0 ? `
       <div style="display: flex; justify-content: space-between; color: #d9534f;">
         <span>Discount:</span>
-        <span>- ${formatMoney(order.discount)}</span>
+        <span>- ${formatMoney(discountVal)}</span>
       </div>` : ''}
       <div class="receipt-double-line"></div>
       <div style="display: flex; justify-content: space-between; font-size: 14px; font-weight: 900;">
         <span>TOTAL PRICE:</span>
-        <span>${formatMoney(order.total_amount)}</span>
+        <span>${formatMoney(totalAmountVal)}</span>
       </div>
       ${order.is_emi && order.emi_type === 'Shop Installment' ? `
       <div style="display: flex; justify-content: space-between; font-size: 11px; font-weight: bold; color: #047857; margin-top: 3px;">
@@ -1390,18 +1411,32 @@ async function loadAccessoriesTable() {
 
   try {
     const res = await fetch(queryUrl);
-    const items = await res.json();
+    const rawItems = await res.json();
+    const allItems = Array.isArray(rawItems) ? rawItems : [];
 
-    document.getElementById('invAccCountBadge').textContent = items.length;
+    const inStockItems = allItems.filter(i => Number(i.stock_quantity || 0) > 0);
+    const outOfStockItems = allItems.filter(i => Number(i.stock_quantity || 0) <= 0);
+
+    // Update subtab badges
+    const accBadge = document.getElementById('invAccCountBadge');
+    if (accBadge) accBadge.textContent = inStockItems.length;
     updateOutOfStockBadge();
+
+    // If not actively searching or filtering, show ONLY in-stock items under "Accessories & General"
+    // Out-of-stock items go under "Out of Stock" section!
+    let displayItems = allItems;
+    if (!search && !lowStockOnly) {
+      displayItems = inStockItems;
+    }
+
     const tbody = document.getElementById('accessoriesTableBody');
 
-    if (items.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="9" class="text-center py-8 text-gray-400">No accessories found.</td></tr>';
+    if (displayItems.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="9" class="text-center py-8 text-gray-400">No accessories found in this view.</td></tr>';
       return;
     }
 
-    tbody.innerHTML = items.map(item => {
+    tbody.innerHTML = displayItems.map(item => {
       const isZero = Number(item.stock_quantity) <= 0;
       const isLow = Number(item.stock_quantity) <= Number(item.min_alert_threshold);
       return `
@@ -1425,9 +1460,9 @@ async function loadAccessoriesTable() {
           <td class="px-4 py-3 text-right font-bold text-gray-900">${formatMoney(item.selling_price)}</td>
           <td class="px-4 py-3 text-center">
             <div class="inline-flex items-center space-x-1.5">
-              <button onclick="quickAdjustStock(${item.id}, -1)" class="w-5 h-5 rounded bg-gray-200 text-gray-700 hover:bg-red-200 font-bold text-xs flex items-center justify-center">-</button>
+              <button onclick="quickAdjustStock('${item.id}', -1)" class="w-5 h-5 rounded bg-gray-200 text-gray-700 hover:bg-red-200 font-bold text-xs flex items-center justify-center">-</button>
               <span class="font-extrabold px-1.5 ${isZero ? 'text-red-600' : isLow ? 'text-amber-600' : 'text-gray-900'}">${item.stock_quantity}</span>
-              <button onclick="quickAdjustStock(${item.id}, 1)" class="w-5 h-5 rounded bg-gray-200 text-gray-700 hover:bg-emerald-200 font-bold text-xs flex items-center justify-center">+</button>
+              <button onclick="quickAdjustStock('${item.id}', 1)" class="w-5 h-5 rounded bg-gray-200 text-gray-700 hover:bg-emerald-200 font-bold text-xs flex items-center justify-center">+</button>
             </div>
           </td>
           <td class="px-4 py-3 text-center text-gray-500">${item.min_alert_threshold}</td>
@@ -1447,9 +1482,9 @@ async function loadAccessoriesTable() {
             `}
           </td>
           <td class="px-4 py-3 text-right space-x-1">
-            <button onclick="openEditItemModal(${item.id})" class="text-indigo-600 hover:text-indigo-900 font-semibold text-xs">Edit</button>
+            <button onclick="openEditItemModal('${item.id}')" class="text-indigo-600 hover:text-indigo-900 font-semibold text-xs">Edit</button>
             <span class="text-gray-300">|</span>
-            <button onclick="deleteItem(${item.id})" class="text-red-600 hover:text-red-800 font-semibold text-xs">Del</button>
+            <button onclick="deleteItem('${item.id}')" class="text-red-600 hover:text-red-800 font-semibold text-xs">Del</button>
           </td>
         </tr>
       `;
@@ -1746,10 +1781,10 @@ async function loadPhonesTable() {
             </span>
           </td>
           <td class="px-4 py-3 text-right space-x-1">
-            <button onclick="openEditPhoneModal(${p.id})" class="text-indigo-600 hover:text-indigo-900 font-semibold text-xs">Edit</button>
+            <button onclick="openEditPhoneModal('${p.id}')" class="text-indigo-600 hover:text-indigo-900 font-semibold text-xs">Edit</button>
             ${!isSold ? `
               <span class="text-gray-300">|</span>
-              <button onclick="deletePhone(${p.id})" class="text-red-600 hover:text-red-800 font-semibold text-xs">Del</button>
+              <button onclick="deletePhone('${p.id}')" class="text-red-600 hover:text-red-800 font-semibold text-xs">Del</button>
             ` : ''}
           </td>
         </tr>
@@ -2005,10 +2040,10 @@ async function loadOutOfStockTable() {
 
       const safeName = (isPhone ? `${item.brand} ${item.model}` : item.title).replace(/'/g, "\\'");
       const restockAction = isPhone
-        ? `<button onclick="quickRestockPhone(${item.id}, '${safeName}')" class="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-xs shadow-xs transition active:scale-95" title="Mark back in stock">+ In-Stock</button>
-           <button onclick="openEditPhoneModal(${item.id})" class="text-gray-500 hover:text-indigo-600 font-semibold text-xs ml-1.5">Edit</button>`
-        : `<button onclick="quickRestockItem(${item.id}, 'accessory', '${safeName}')" class="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-xs shadow-xs transition active:scale-95" title="Quick add inventory quantity">+ Restock</button>
-           <button onclick="openEditItemModal(${item.id})" class="text-gray-500 hover:text-indigo-600 font-semibold text-xs ml-1.5">Edit</button>`;
+        ? `<button onclick="quickRestockPhone('${item.id}', '${safeName}')" class="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-xs shadow-xs transition active:scale-95" title="Mark back in stock">+ In-Stock</button>
+           <button onclick="openEditPhoneModal('${item.id}')" class="text-gray-500 hover:text-indigo-600 font-semibold text-xs ml-1.5">Edit</button>`
+        : `<button onclick="quickRestockItem('${item.id}', 'accessory', '${safeName}')" class="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-xs shadow-xs transition active:scale-95" title="Quick add inventory quantity">+ Restock</button>
+           <button onclick="openEditItemModal('${item.id}')" class="text-gray-500 hover:text-indigo-600 font-semibold text-xs ml-1.5">Edit</button>`;
 
       return `
         <tr class="hover:bg-red-50/20 bg-red-50/10">
@@ -2184,6 +2219,23 @@ async function loadOrdersTable() {
       const isBankEmi = isEmi && o.emi_type === 'Bank EMI';
       const hasDue = isShopInstallment && (parseFloat(o.emi_remaining_due) > 0);
 
+      // Robust fallback financial calculations
+      const itemsList = Array.isArray(o.items) ? o.items : [];
+      const computedSubtotal = itemsList.reduce((acc, it) => acc + (parseFloat(it.selling_price || it.unit_price || 0) * (parseInt(it.quantity, 10) || 1)), 0);
+      const subtotalVal = (o.subtotal !== undefined && o.subtotal !== null && Number(o.subtotal) > 0)
+        ? parseFloat(o.subtotal)
+        : (computedSubtotal || parseFloat(o.total_amount || 0));
+      const discountVal = parseFloat(o.discount || o.discount_amount || 0);
+      const totalAmountVal = (o.total_amount !== undefined && o.total_amount !== null && Number(o.total_amount) > 0)
+        ? parseFloat(o.total_amount)
+        : (o.final_amount ? parseFloat(o.final_amount) : Math.max(0, subtotalVal - discountVal));
+      const computedCost = itemsList.reduce((acc, it) => acc + (parseFloat(it.cost_price || it.purchase_cost || it.unit_cost || 0) * (parseInt(it.quantity, 10) || 1)), 0);
+      const costVal = parseFloat(o.total_cost || computedCost || 0);
+      const profitVal = (o.profit_margin !== undefined && o.profit_margin !== null && Number(o.profit_margin) !== 0)
+        ? parseFloat(o.profit_margin)
+        : (totalAmountVal - costVal);
+      const orderIdStr = String(o.id || o.invoice_number || '');
+
       // Payment / Plan Badge
       let paymentBadge = '';
       if (isBankEmi) {
@@ -2206,16 +2258,16 @@ async function loadOrdersTable() {
         if (hasDue) {
           duePaidHtml = `
             <span class="text-xs font-bold text-red-600 block">Due: ${formatMoney(o.emi_remaining_due)}</span>
-            <span class="text-[10px] text-emerald-600 block font-medium">Paid: ${formatMoney(o.total_amount - o.emi_remaining_due)}</span>
+            <span class="text-[10px] text-emerald-600 block font-medium">Paid: ${formatMoney(totalAmountVal - o.emi_remaining_due)}</span>
           `;
         } else {
           duePaidHtml = `
             <span class="text-xs font-bold text-emerald-600 block">✅ Fully Paid</span>
-            <span class="text-[10px] text-gray-400 block font-medium">Total: ${formatMoney(o.total_amount)}</span>
+            <span class="text-[10px] text-gray-400 block font-medium">Total: ${formatMoney(totalAmountVal)}</span>
           `;
         }
       } else {
-        duePaidHtml = `<span class="text-xs font-bold text-gray-800 block">${formatMoney(o.total_amount)}</span><span class="text-[10px] text-emerald-600 block font-medium">Paid</span>`;
+        duePaidHtml = `<span class="text-xs font-bold text-gray-800 block">${formatMoney(totalAmountVal)}</span><span class="text-[10px] text-emerald-600 block font-medium">Paid</span>`;
       }
 
       // Actions button
@@ -2223,17 +2275,17 @@ async function loadOrdersTable() {
       if (hasDue) {
         actionButtons = `
           <div class="flex items-center justify-center space-x-1">
-            <button onclick="openCollectEmiModal(${o.id})" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-2 py-1 rounded text-xs transition shadow-sm" title="Collect Monthly Installment">
+            <button onclick="openCollectEmiModal('${orderIdStr}')" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-2 py-1 rounded text-xs transition shadow-sm" title="Collect Monthly Installment">
               💰 Collect
             </button>
-            <button onclick="reprintOrderReceipt(${o.id})" class="bg-indigo-50 hover:bg-indigo-600 hover:text-white text-indigo-700 font-bold px-2 py-1 rounded text-xs transition" title="Print Invoice">
+            <button onclick="reprintOrderReceipt('${orderIdStr}')" class="bg-indigo-50 hover:bg-indigo-600 hover:text-white text-indigo-700 font-bold px-2 py-1 rounded text-xs transition" title="Print Invoice">
               Receipt
             </button>
           </div>
         `;
       } else {
         actionButtons = `
-          <button onclick="reprintOrderReceipt(${o.id})" class="bg-indigo-50 hover:bg-indigo-600 hover:text-white text-indigo-700 font-bold px-2 py-1 rounded text-xs transition">
+          <button onclick="reprintOrderReceipt('${orderIdStr}')" class="bg-indigo-50 hover:bg-indigo-600 hover:text-white text-indigo-700 font-bold px-2 py-1 rounded text-xs transition">
             Receipt
           </button>
         `;
@@ -2251,12 +2303,12 @@ async function loadOrdersTable() {
           <td class="px-4 py-3">
             ${paymentBadge}
           </td>
-          <td class="px-4 py-3 text-right text-gray-600">${formatMoney(o.subtotal)}</td>
-          <td class="px-4 py-3 text-right text-red-600 font-medium">${o.discount > 0 ? '-' + formatMoney(o.discount) : '৳ 0.00'}</td>
+          <td class="px-4 py-3 text-right text-gray-600">${formatMoney(subtotalVal)}</td>
+          <td class="px-4 py-3 text-right text-red-600 font-medium">${discountVal > 0 ? '-' + formatMoney(discountVal) : '৳ 0.00'}</td>
           <td class="px-4 py-3 text-right">
             ${duePaidHtml}
           </td>
-          <td class="px-4 py-3 text-right text-emerald-700 font-bold">${formatMoney(o.profit_margin)}</td>
+          <td class="px-4 py-3 text-right text-emerald-700 font-bold">${formatMoney(profitVal)}</td>
           <td class="px-4 py-3 text-center">
             ${actionButtons}
           </td>
@@ -2891,13 +2943,13 @@ if (window.FirebaseDB && window.FirebaseDB.onSync) {
       if (state.activeTab === 'inventory') {
         loadAccessoriesTable();
         loadPhonesTable();
-        loadOutOfStock();
+        loadOutOfStockTable();
       }
       updateOutOfStockBadge();
     } else if (type === 'categories') {
       loadCategories();
     } else if (type === 'orders') {
-      if (state.activeTab === 'orders') loadInvoices();
+      if (state.activeTab === 'orders') loadOrdersTable();
       if (state.activeTab === 'reports') loadReports();
     }
   });

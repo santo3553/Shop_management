@@ -366,6 +366,45 @@ const FirebaseDB = {
         }
       }
 
+      // Calculate financial totals
+      let calculatedSubtotal = 0;
+      let calculatedTotalCost = 0;
+      const processedCart = cart.map(item => {
+        const qty = Math.max(1, parseInt(item.quantity, 10) || 1);
+        const unitPrice = Math.max(0, parseFloat(item.unit_price || item.selling_price) || 0);
+        const unitCost = Math.max(0, parseFloat(item.unit_cost || item.cost_price) || 0);
+        const lineTotal = Math.max(0, parseFloat(item.total_price) || (unitPrice * qty));
+        calculatedSubtotal += lineTotal;
+        calculatedTotalCost += (unitCost * qty);
+        return {
+          ...item,
+          quantity: qty,
+          unit_price: unitPrice,
+          unit_cost: unitCost,
+          total_price: lineTotal
+        };
+      });
+
+      const discount = Math.max(0, parseFloat(orderDetails.discount || orderDetails.discount_amount) || 0);
+      const subtotal = Math.max(0, parseFloat(orderDetails.subtotal) || calculatedSubtotal);
+      const finalAmount = Math.max(0, parseFloat(orderDetails.final_amount || orderDetails.total_amount) || (subtotal - discount));
+      const totalCost = Math.max(0, parseFloat(orderDetails.total_cost) || calculatedTotalCost);
+      const profitMargin = finalAmount - totalCost;
+
+      const isEmi = !!orderDetails.is_emi;
+      let remainingDue = 0;
+      let paidAmount = finalAmount;
+      if (isEmi) {
+        if (orderDetails.emi_type === 'Bank EMI') {
+          remainingDue = 0;
+          paidAmount = finalAmount;
+        } else {
+          const downPayment = Math.max(0, parseFloat(orderDetails.emi_down_payment) || 0);
+          remainingDue = Math.max(0, finalAmount - downPayment);
+          paidAmount = downPayment;
+        }
+      }
+
       // 3. Create Order Document
       const orderRef = this.db.collection('orders').doc(invoiceNumber);
       const cleanOrder = {
@@ -376,17 +415,22 @@ const FirebaseDB = {
         customer_nid: orderDetails.customer_nid || '',
         guarantor_name: orderDetails.guarantor_name || '',
         guarantor_phone: orderDetails.guarantor_phone || '',
-        subtotal: Number(orderDetails.subtotal || 0),
-        discount_amount: Number(orderDetails.discount_amount || 0),
-        final_amount: Number(orderDetails.final_amount || 0),
-        paid_amount: Number(orderDetails.paid_amount || 0),
+        subtotal: subtotal,
+        discount: discount,
+        discount_amount: discount,
+        total_amount: finalAmount,
+        final_amount: finalAmount,
+        total_cost: totalCost,
+        profit_margin: profitMargin,
+        paid_amount: paidAmount,
         payment_method: orderDetails.payment_method || 'Cash',
-        is_emi: !!orderDetails.is_emi,
-        emi_type: orderDetails.emi_type || 'Full Payment',
+        is_emi: isEmi,
+        emi_type: orderDetails.emi_type || (isEmi ? 'Shop Installment' : 'Full Payment'),
         emi_tenure_months: Number(orderDetails.emi_tenure_months || 0),
         emi_monthly_amount: Number(orderDetails.emi_monthly_amount || 0),
-        emi_remaining_due: Number(orderDetails.emi_remaining_due || 0),
-        items: cart,
+        emi_remaining_due: remainingDue,
+        emi_down_payment: Number(orderDetails.emi_down_payment || 0),
+        items: processedCart,
         created_at: nowIso
       };
 
@@ -960,29 +1004,73 @@ const FirebaseDB = {
         let filtered = [...this.cache.orders];
         if (month && year) {
           filtered = filtered.filter(o => {
+            if (!o.created_at) return false;
             const d = new Date(o.created_at);
             return (d.getMonth() + 1) === parseInt(month, 10) && d.getFullYear() === parseInt(year, 10);
           });
         }
-        const totalRevenue = filtered.reduce((sum, o) => sum + (Number(o.final_amount) || 0), 0);
+
+        let totalRevenue = 0;
+        let totalCogs = 0;
+        let itemsSold = 0;
+        const accSalesMap = {};
+
+        filtered.forEach(o => {
+          const items = Array.isArray(o.items) ? o.items : [];
+          const calculatedSubtotal = items.reduce((s, it) => s + (Number(it.total_price) || (Number(it.unit_price || 0) * Number(it.quantity || 1))), 0);
+          const orderDiscount = Number(o.discount || o.discount_amount || 0);
+          const orderRevenue = Number(o.total_amount || o.final_amount) || Math.max(0, calculatedSubtotal - orderDiscount);
+          totalRevenue += orderRevenue;
+
+          const calculatedCost = items.reduce((s, it) => s + (Number(it.unit_cost || it.cost_price || 0) * Number(it.quantity || 1)), 0);
+          const orderCost = Number(o.total_cost) || calculatedCost;
+          totalCogs += orderCost;
+
+          items.forEach(it => {
+            const qty = Number(it.quantity || 1);
+            itemsSold += qty;
+            const title = it.title || it.name || 'Product';
+            const sku = it.sku_or_imei || it.code || '-';
+            const lineRev = Number(it.total_price) || (Number(it.unit_price || 0) * qty);
+
+            if (!accSalesMap[title]) {
+              accSalesMap[title] = { title, sku_or_imei: sku, units_sold: 0, revenue: 0 };
+            }
+            accSalesMap[title].units_sold += qty;
+            accSalesMap[title].revenue += lineRev;
+          });
+        });
+
+        const grossProfit = totalRevenue - totalCogs;
+        const profitMarginPct = totalRevenue > 0 ? ((grossProfit / totalRevenue) * 100).toFixed(1) : 0;
+        const topAccessories = Object.values(accSalesMap).sort((a, b) => b.units_sold - a.units_sold).slice(0, 10);
+
+        const inStockPhones = this.cache.phones.filter(p => p.status === 'In-Stock');
+        const inStockCost = inStockPhones.reduce((s, p) => s + Number(p.purchase_cost || 0), 0);
+        const soldPhones = this.cache.phones.filter(p => p.status === 'Sold');
+
+        const totalAccRetail = this.cache.items.reduce((s, i) => s + (Number(i.selling_price || 0) * Number(i.stock_quantity || 0)), 0);
+        const totalAccCost = this.cache.items.reduce((s, i) => s + (Number(i.cost_price || 0) * Number(i.stock_quantity || 0)), 0);
+
         return this._json({
           sales: {
             total_orders: filtered.length,
             total_revenue: totalRevenue,
-            total_cogs: 0,
-            gross_profit: totalRevenue,
-            profit_margin_pct: 100,
-            items_sold: filtered.reduce((sum, o) => sum + (o.items ? o.items.length : 1), 0)
+            total_cogs: totalCogs,
+            gross_profit: grossProfit,
+            profit_margin_pct: profitMarginPct,
+            items_sold: itemsSold
           },
           stock: {
-            total_accessory_retail: this.cache.items.reduce((s, i) => s + (Number(i.selling_price) * Number(i.stock_quantity)), 0),
-            total_accessory_cost: this.cache.items.reduce((s, i) => s + (Number(i.cost_price) * Number(i.stock_quantity)), 0)
+            total_accessory_retail: totalAccRetail,
+            total_accessory_cost: totalAccCost
           },
           handsets: {
-            in_stock_count: this.cache.phones.filter(p => p.status === 'In-Stock').length,
-            in_stock_cost_value: this.cache.phones.filter(p => p.status === 'In-Stock').reduce((s, p) => s + Number(p.purchase_cost || 0), 0),
-            sold_count: this.cache.phones.filter(p => p.status === 'Sold').length
-          }
+            in_stock_count: inStockPhones.length,
+            in_stock_cost_value: inStockCost,
+            sold_count: soldPhones.length
+          },
+          top_accessories: topAccessories
         });
       }
 
