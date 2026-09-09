@@ -201,6 +201,7 @@ const AuthSecurity = {
       this.activeChallengeResolver = async (success) => {
         if (success) {
           this.currentRole = 'owner';
+          this.hideLockScreen();
           this._resetAutoLockTimer();
           this.updateUI();
           this._notifyListeners();
@@ -310,11 +311,14 @@ const AuthSecurity = {
     const screen = document.getElementById('appLaunchLockScreen');
     if (screen) {
       screen.classList.remove('hidden');
-      screen.classList.add('flex');
+      screen.style.setProperty('display', 'flex', 'important');
     }
     this._renderLockDots();
     const errEl = document.getElementById('lockScreenError');
-    if (errEl) errEl.classList.add('hidden');
+    if (errEl) {
+      errEl.classList.add('hidden');
+      errEl.style.setProperty('display', 'none', 'important');
+    }
 
     // Prompt native biometric prompt if available on device
     setTimeout(() => {
@@ -334,7 +338,7 @@ const AuthSecurity = {
     const screen = document.getElementById('appLaunchLockScreen');
     if (screen) {
       screen.classList.add('hidden');
-      screen.classList.remove('flex');
+      screen.style.setProperty('display', 'none', 'important');
     }
   },
 
@@ -383,7 +387,10 @@ const AuthSecurity = {
     this.lockPinBuffer = '';
     this._renderLockDots();
     const errEl = document.getElementById('lockScreenError');
-    if (errEl) errEl.classList.add('hidden');
+    if (errEl) {
+      errEl.classList.add('hidden');
+      errEl.style.setProperty('display', 'none', 'important');
+    }
   },
 
   _renderLockDots() {
@@ -403,6 +410,7 @@ const AuthSecurity = {
     if (errEl) {
       errEl.textContent = '❌ Invalid PIN. Please try again.';
       errEl.classList.remove('hidden');
+      errEl.style.setProperty('display', 'flex', 'important');
     }
     const dots = document.querySelectorAll('.lock-pin-dot');
     dots.forEach(dot => {
@@ -459,6 +467,7 @@ const AuthSecurity = {
     if (errEl) {
       errEl.textContent = '❌ Fingerprint not recognized. Try again or enter PIN.';
       errEl.classList.remove('hidden');
+      errEl.style.setProperty('display', 'flex', 'important');
     }
     if (window.playBeep) window.playBeep(220, 'sawtooth', 0.2);
   },
@@ -570,6 +579,11 @@ const AuthSecurity = {
     } else {
       document.body.classList.add('role-staff');
       document.body.classList.remove('role-owner');
+    }
+
+    // 4. Ensure lock screen is completely hidden when app is unlocked
+    if (!this.isAppLocked) {
+      this.hideLockScreen();
     }
   },
 
