@@ -1384,6 +1384,21 @@ function startCameraScanForPhoneImei() {
   }
 }
 
+function startCameraScanForOrders() {
+  if (window.CameraScanner) {
+    CameraScanner.open((code) => {
+      const input = document.getElementById('orderSearchInput');
+      if (input) {
+        input.value = code;
+        renderOrdersCards();
+        showToast(`Filtered for: ${code}`, '🔍');
+      }
+    }, 'Scan Invoice Barcode or IMEI');
+  } else {
+    showToast('Camera scanner not ready', '⚠️');
+  }
+}
+
 /* =========================================================
    PRODUCT PHOTO HANDLING & CLIENT-SIDE COMPRESSION
 ========================================================= */
@@ -2265,187 +2280,272 @@ async function exportOutOfStockCsv() {
 }
 
 /* =========================================================
-   INVOICES & ORDERS HISTORY
+   INVOICES & ORDERS HISTORY (CARD-BASED VIEW - MOCKUP 4)
 ========================================================= */
+state.orderFilterTab = 'all';
+
+function filterOrdersTab(filterName) {
+  state.orderFilterTab = filterName;
+  ['all', 'paid', 'due', 'void'].forEach(f => {
+    const btn = document.getElementById(`orderFilterBtn-${f}`);
+    if (btn) {
+      if (f === filterName) {
+        btn.className = 'cat-pill active bg-blue-600 text-white px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition';
+      } else {
+        btn.className = 'cat-pill bg-gray-100 text-gray-700 hover:bg-gray-200 px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition';
+      }
+    }
+  });
+  renderOrdersCards();
+}
+
 let orderSearchTimer;
 function debouncedSearchOrders() {
   clearTimeout(orderSearchTimer);
   orderSearchTimer = setTimeout(() => {
-    loadOrdersTable();
+    renderOrdersCards();
   }, 250);
 }
 
 async function loadOrdersTable() {
-  const search = document.getElementById('orderSearchInput')?.value.trim() || '';
-  const emiFilter = document.getElementById('orderEmiFilter')?.value || '';
-
-  let url = '/api/orders?';
-  const params = [];
-  if (search) params.push(`search=${encodeURIComponent(search)}`);
-
-  if (emiFilter === 'active_due') {
-    url = `/api/emi/orders?status=Active`;
-    if (search) url += `&search=${encodeURIComponent(search)}`;
-  } else {
-    if (emiFilter === '1') params.push('is_emi=1');
-    url += params.join('&');
-  }
-
   try {
-    const res = await fetch(url);
+    const res = await fetch('/api/orders');
     const orders = await res.json();
-
-    // Calculate Today's KPI metrics for #ordersTodaySummaryCard (Mockup 4)
-    const todayStr = new Date().toISOString().split('T')[0];
-    const todayOrders = Array.isArray(orders) ? orders.filter(o => o.created_at && o.created_at.startsWith(todayStr) && o.status !== 'VOID') : [];
-    const todayGross = todayOrders.reduce((sum, o) => sum + (parseFloat(o.total_amount || o.final_amount || 0)), 0);
-    const todayProfit = todayOrders.reduce((sum, o) => sum + (parseFloat(o.profit_margin || 0)), 0);
-
-    const kpiGrossEl = document.getElementById('kpiTodayGross');
-    const kpiProfitEl = document.getElementById('kpiTodayProfit');
-    const kpiCountEl = document.getElementById('kpiTodayCount');
-    if (kpiGrossEl) kpiGrossEl.textContent = formatMoney(todayGross);
-    if (kpiProfitEl) kpiProfitEl.textContent = formatMoney(todayProfit);
-    if (kpiCountEl) kpiCountEl.textContent = `${todayOrders.length} Invoice${todayOrders.length === 1 ? '' : 's'}`;
-
-    const tbody = document.getElementById('ordersTableBody');
-
-    if (orders.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="9" class="text-center py-8 text-gray-400 font-medium">No sales transactions found.</td></tr>';
-      return;
-    }
-
-    tbody.innerHTML = orders.map(o => {
-      const isEmi = o.is_emi == 1 || o.is_emi === true;
-      const isShopInstallment = isEmi && o.emi_type === 'Shop Installment';
-      const isBankEmi = isEmi && o.emi_type === 'Bank EMI';
-      const hasDue = isShopInstallment && (parseFloat(o.emi_remaining_due) > 0);
-      const isVoid = o.status === 'VOID';
-      const isOwner = window.AuthSecurity && window.AuthSecurity.isOwner();
-      const displayNid = isOwner ? o.customer_nid : (window.AuthSecurity ? window.AuthSecurity.maskNid(o.customer_nid) : o.customer_nid);
-
-      // Robust fallback financial calculations
-      const itemsList = Array.isArray(o.items) ? o.items : [];
-      const computedSubtotal = itemsList.reduce((acc, it) => acc + (parseFloat(it.selling_price || it.unit_price || 0) * (parseInt(it.quantity, 10) || 1)), 0);
-      const subtotalVal = (o.subtotal !== undefined && o.subtotal !== null && Number(o.subtotal) > 0)
-        ? parseFloat(o.subtotal)
-        : (computedSubtotal || parseFloat(o.total_amount || 0));
-      const discountVal = parseFloat(o.discount || o.discount_amount || 0);
-      const totalAmountVal = (o.total_amount !== undefined && o.total_amount !== null && Number(o.total_amount) > 0)
-        ? parseFloat(o.total_amount)
-        : (o.final_amount ? parseFloat(o.final_amount) : Math.max(0, subtotalVal - discountVal));
-      const computedCost = itemsList.reduce((acc, it) => acc + (parseFloat(it.cost_price || it.purchase_cost || it.unit_cost || 0) * (parseInt(it.quantity, 10) || 1)), 0);
-      const costVal = parseFloat(o.total_cost || computedCost || 0);
-      const profitVal = (o.profit_margin !== undefined && o.profit_margin !== null && Number(o.profit_margin) !== 0)
-        ? parseFloat(o.profit_margin)
-        : (totalAmountVal - costVal);
-      const orderIdStr = String(o.id || o.invoice_number || '');
-
-      // Payment / Plan Badge
-      let paymentBadge = '';
-      if (isBankEmi) {
-        paymentBadge = `
-          <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800">🏦 Bank EMI (${o.emi_tenure_months}M)</span>
-          <span class="block text-[10px] text-gray-500 font-medium mt-0.5">${o.emi_bank_name || 'Bank Card'}</span>
-        `;
-      } else if (isShopInstallment) {
-        paymentBadge = `
-          <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">📋 Installment (${o.emi_tenure_months}M)</span>
-          <span class="block text-[10px] text-gray-500 font-medium mt-0.5">${formatMoney(o.emi_monthly_amount)}/mo</span>
-        `;
-      } else {
-        paymentBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-gray-100 text-gray-700">${o.payment_method}</span>`;
-      }
-
-      // Due / Paid display
-      let duePaidHtml = '';
-      if (isVoid) {
-        duePaidHtml = `<span class="text-xs font-bold text-red-600 block">VOIDED</span><span class="text-[10px] text-gray-400 block font-medium">Cancelled</span>`;
-      } else if (isShopInstallment) {
-        if (hasDue) {
-          duePaidHtml = `
-            <span class="text-xs font-bold text-red-600 block">Due: ${formatMoney(o.emi_remaining_due)}</span>
-            <span class="text-[10px] text-emerald-600 block font-medium">Paid: ${formatMoney(totalAmountVal - o.emi_remaining_due)}</span>
-          `;
-        } else {
-          duePaidHtml = `
-            <span class="text-xs font-bold text-emerald-600 block">✅ Fully Paid</span>
-            <span class="text-[10px] text-gray-400 block font-medium">Total: ${formatMoney(totalAmountVal)}</span>
-          `;
-        }
-      } else {
-        duePaidHtml = `<span class="text-xs font-bold text-gray-800 block">${formatMoney(totalAmountVal)}</span><span class="text-[10px] text-emerald-600 block font-medium">Paid</span>`;
-      }
-
-      // Actions button
-      let actionButtons = '';
-      if (isVoid) {
-        actionButtons = `
-          <div class="flex items-center justify-center space-x-1">
-            <button onclick="reprintOrderReceipt('${orderIdStr}')" class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold px-2 py-1 rounded text-xs transition" title="View Voided Receipt">
-              Receipt
-            </button>
-            <span class="px-1.5 py-0.5 bg-red-50 text-red-400 rounded text-[10px] font-bold border border-red-100 cursor-not-allowed">Voided</span>
-          </div>
-        `;
-      } else if (hasDue) {
-        actionButtons = `
-          <div class="flex items-center justify-center space-x-1">
-            <button onclick="openCollectEmiModal('${orderIdStr}')" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-2 py-1 rounded text-xs transition shadow-sm" title="Collect Monthly Installment">
-              💰 Collect
-            </button>
-            <button onclick="reprintOrderReceipt('${orderIdStr}')" class="bg-indigo-50 hover:bg-indigo-600 hover:text-white text-indigo-700 font-bold px-2 py-1 rounded text-xs transition" title="Print Invoice">
-              Receipt
-            </button>
-            <button onclick="openVoidInvoiceModal('${orderIdStr}')" class="bg-red-50 hover:bg-red-600 hover:text-white text-red-700 font-bold px-2 py-1 rounded text-xs transition" title="Void invoice & restock items">
-              🚫 Void
-            </button>
-          </div>
-        `;
-      } else {
-        actionButtons = `
-          <div class="flex items-center justify-center space-x-1">
-            <button onclick="reprintOrderReceipt('${orderIdStr}')" class="bg-indigo-50 hover:bg-indigo-600 hover:text-white text-indigo-700 font-bold px-2 py-1 rounded text-xs transition">
-              Receipt
-            </button>
-            <button onclick="openVoidInvoiceModal('${orderIdStr}')" class="bg-red-50 hover:bg-red-600 hover:text-white text-red-700 font-bold px-2 py-1 rounded text-xs transition" title="Void invoice & restock items">
-              🚫 Void
-            </button>
-          </div>
-        `;
-      }
-
-      return `
-        <tr class="hover:bg-gray-50 ${isVoid ? 'bg-red-50/20 opacity-75' : ''}">
-          <td class="px-4 py-3 font-mono font-bold ${isVoid ? 'line-through text-red-400' : 'text-indigo-700'}">
-            ${o.invoice_number}
-            ${isVoid ? '<span class="inline-block mt-0.5 px-1 py-0.2 rounded text-[9px] font-black bg-red-100 text-red-700 border border-red-200">VOID</span>' : ''}
-          </td>
-          <td class="px-4 py-3 text-gray-600 text-[11px]">${new Date(o.created_at).toLocaleString()}</td>
-          <td class="px-4 py-3">
-            <span class="font-bold text-gray-900">${o.customer_name}</span>
-            ${o.customer_phone ? `<span class="block text-[10px] text-gray-500 font-medium">${o.customer_phone}</span>` : ''}
-            ${displayNid ? `<span class="block text-[10px] text-gray-400 font-mono">NID: ${displayNid}</span>` : ''}
-            ${isVoid ? `<span class="block text-[10px] text-red-600 font-medium mt-0.5 italic">🚫 Void: ${o.void_reason || 'Cancelled'}</span>` : ''}
-          </td>
-          <td class="px-4 py-3">
-            ${paymentBadge}
-          </td>
-          <td class="px-4 py-3 text-right text-gray-600">${formatMoney(subtotalVal)}</td>
-          <td class="px-4 py-3 text-right text-red-600 font-medium">${discountVal > 0 ? '-' + formatMoney(discountVal) : '৳ 0.00'}</td>
-          <td class="px-4 py-3 text-right">
-            ${duePaidHtml}
-          </td>
-          <td class="px-4 py-3 text-right text-emerald-700 font-bold owner-only-stat">${formatMoney(profitVal)}</td>
-          <td class="px-4 py-3 text-center">
-            ${actionButtons}
-          </td>
-        </tr>
-      `;
-    }).join('');
+    state.allOrders = Array.isArray(orders) ? orders : [];
+    renderOrdersCards();
   } catch (err) {
     console.error('Failed to load orders:', err);
+    const container = document.getElementById('ordersCardList');
+    if (container) {
+      container.innerHTML = `<div class="text-center py-8 text-red-500 font-medium bg-white rounded-2xl border border-gray-200">Failed to load sales records: ${err.message}</div>`;
+    }
   }
+}
+
+function renderOrdersCards() {
+  const container = document.getElementById('ordersCardList');
+  if (!container) return;
+
+  const orders = state.allOrders || [];
+
+  // Update total count badge
+  const totalCountEl = document.getElementById('ordersCount-all');
+  if (totalCountEl) totalCountEl.textContent = orders.length;
+
+  // 1. Calculate Today's KPI metrics for widget (Mockup 4)
+  const todayIso = new Date().toISOString().split('T')[0];
+  const todayOrders = orders.filter(o => o.created_at && o.created_at.startsWith(todayIso) && o.status !== 'VOID');
+  const todayGross = todayOrders.reduce((sum, o) => sum + (parseFloat(o.total_amount || o.final_amount || 0)), 0);
+  const todayProfit = todayOrders.reduce((sum, o) => sum + (parseFloat(o.profit_margin || 0)), 0);
+  const marginPct = todayGross > 0 ? ((todayProfit / todayGross) * 100).toFixed(1) + '%' : '0%';
+  const paidTodayCount = todayOrders.filter(o => !o.is_emi || !o.emi_remaining_due || parseFloat(o.emi_remaining_due) <= 0).length;
+  const paidPct = todayOrders.length > 0 ? Math.round((paidTodayCount / todayOrders.length) * 100) : 100;
+
+  const kpiGrossEl = document.getElementById('kpiTodayGross');
+  const kpiProfitEl = document.getElementById('kpiTodayProfit');
+  const kpiCountEl = document.getElementById('kpiTodayCount');
+  const kpiMarginSub = document.getElementById('kpiTodayMarginSub');
+  const kpiPaidSub = document.getElementById('kpiTodayPaidSub');
+  const dateBadge = document.getElementById('ordersTodayDateBadge');
+
+  if (kpiGrossEl) kpiGrossEl.textContent = formatMoney(todayGross);
+  if (kpiProfitEl) kpiProfitEl.textContent = '+ ' + formatMoney(todayProfit);
+  if (kpiCountEl) kpiCountEl.textContent = todayOrders.length;
+  if (kpiMarginSub) kpiMarginSub.textContent = `${marginPct} margin`;
+  if (kpiPaidSub) kpiPaidSub.textContent = `${paidPct}% Paid`;
+  if (dateBadge) {
+    dateBadge.textContent = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+
+  // 2. Filter orders
+  let filtered = orders;
+  const searchInput = document.getElementById('orderSearchInput')?.value.trim().toLowerCase() || '';
+  if (searchInput) {
+    filtered = filtered.filter(o => {
+      const inv = (o.invoice_number || '').toLowerCase();
+      const cust = (o.customer_name || '').toLowerCase();
+      const phone = (o.customer_phone || '').toLowerCase();
+      const nid = (o.customer_nid || '').toLowerCase();
+      return inv.includes(searchInput) || cust.includes(searchInput) || phone.includes(searchInput) || nid.includes(searchInput);
+    });
+  }
+
+  if (state.orderFilterTab === 'paid') {
+    filtered = filtered.filter(o => o.status !== 'VOID' && (!o.is_emi || !o.emi_remaining_due || parseFloat(o.emi_remaining_due) <= 0));
+  } else if (state.orderFilterTab === 'due') {
+    filtered = filtered.filter(o => o.status !== 'VOID' && o.is_emi && parseFloat(o.emi_remaining_due || 0) > 0);
+  } else if (state.orderFilterTab === 'void') {
+    filtered = filtered.filter(o => o.status === 'VOID');
+  }
+
+  if (filtered.length === 0) {
+    container.innerHTML = `
+      <div class="text-center py-12 bg-white rounded-2xl border border-gray-200 shadow-xs">
+        <span class="text-3xl block mb-2">📄</span>
+        <p class="text-sm font-bold text-gray-700">No invoices found in this view</p>
+        <p class="text-xs text-gray-400 mt-1">Try switching filter tabs or clear your search.</p>
+      </div>
+    `;
+    return;
+  }
+
+  // 3. Render Cards matching Mockup 4
+  container.innerHTML = filtered.map(o => {
+    const isEmi = o.is_emi == 1 || o.is_emi === true;
+    const isShopInstallment = isEmi && o.emi_type === 'Shop Installment';
+    const isBankEmi = isEmi && o.emi_type === 'Bank EMI';
+    const hasDue = isShopInstallment && (parseFloat(o.emi_remaining_due) > 0);
+    const isVoid = o.status === 'VOID';
+    const isOwner = window.AuthSecurity && window.AuthSecurity.isOwner();
+    const displayNid = isOwner ? o.customer_nid : (window.AuthSecurity ? window.AuthSecurity.maskNid(o.customer_nid) : o.customer_nid);
+
+    const itemsList = Array.isArray(o.items) ? o.items : [];
+    const computedSubtotal = itemsList.reduce((acc, it) => acc + (parseFloat(it.selling_price || it.unit_price || 0) * (parseInt(it.quantity, 10) || 1)), 0);
+    const subtotalVal = (o.subtotal !== undefined && o.subtotal !== null && Number(o.subtotal) > 0)
+      ? parseFloat(o.subtotal)
+      : (computedSubtotal || parseFloat(o.total_amount || 0));
+    const discountVal = parseFloat(o.discount || o.discount_amount || 0);
+    const totalAmountVal = (o.total_amount !== undefined && o.total_amount !== null && Number(o.total_amount) > 0)
+      ? parseFloat(o.total_amount)
+      : (o.final_amount ? parseFloat(o.final_amount) : Math.max(0, subtotalVal - discountVal));
+    const computedCost = itemsList.reduce((acc, it) => acc + (parseFloat(it.cost_price || it.purchase_cost || it.unit_cost || 0) * (parseInt(it.quantity, 10) || 1)), 0);
+    const costVal = parseFloat(o.total_cost || computedCost || 0);
+    const profitVal = (o.profit_margin !== undefined && o.profit_margin !== null && Number(o.profit_margin) !== 0)
+      ? parseFloat(o.profit_margin)
+      : (totalAmountVal - costVal);
+    const orderIdStr = String(o.id || o.invoice_number || '');
+
+    const isHandset = itemsList.some(it => it.item_type === 'phone' || it.type === 'phone' || !!it.imei_number);
+    const isHighValue = totalAmountVal >= 50000 || isHandset;
+
+    // Time format
+    let timeStr = '';
+    try {
+      timeStr = new Date(o.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+    } catch (_) {
+      timeStr = '';
+    }
+
+    // Status Pill & Summary
+    let statusBadge = '';
+    let statusSummaryHtml = '';
+    if (isVoid) {
+      statusBadge = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700 border border-red-200">Void</span>';
+      statusSummaryHtml = '<span class="w-2 h-2 rounded-full bg-red-500"></span><span class="font-bold text-red-600">Voided / Cancelled</span>';
+    } else if (hasDue) {
+      statusBadge = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">Due</span>';
+      statusSummaryHtml = `<span class="w-2 h-2 rounded-full bg-amber-500"></span><span class="font-bold text-amber-700">Due: ${formatMoney(o.emi_remaining_due)}</span>`;
+    } else {
+      statusBadge = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">Paid</span>';
+      statusSummaryHtml = '<span class="w-2 h-2 rounded-full bg-emerald-500"></span><span class="font-medium text-gray-600">Settled in full</span>';
+    }
+
+    // Payment method pill
+    let paymentMethodPill = '';
+    if (isBankEmi) {
+      paymentMethodPill = `<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-50 text-blue-800 border border-blue-100">Bank EMI (${o.emi_tenure_months}M)</span>`;
+    } else if (isShopInstallment) {
+      paymentMethodPill = `<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-100">Installment (${o.emi_tenure_months}M)</span>`;
+    } else {
+      paymentMethodPill = `<span class="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-gray-100 text-gray-700">${o.payment_method || 'Cash'}</span>`;
+    }
+
+    // Action buttons
+    let actionButtons = '';
+    if (isVoid) {
+      actionButtons = `
+        <button onclick="reprintOrderReceipt('${orderIdStr}')" class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold px-3 py-1.5 rounded-xl text-xs flex items-center space-x-1 transition shadow-xs">
+          <span>🖨️ Receipt</span>
+        </button>
+      `;
+    } else if (hasDue) {
+      actionButtons = `
+        <button onclick="openCollectEmiModal('${orderIdStr}')" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-xl text-xs flex items-center space-x-1 transition shadow-xs active:scale-95">
+          <span>💰 Collect</span>
+        </button>
+        <button onclick="reprintOrderReceipt('${orderIdStr}')" class="bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold px-3 py-1.5 rounded-xl text-xs flex items-center space-x-1 transition shadow-xs active:scale-95">
+          <span>🖨️ Receipt</span>
+        </button>
+        <button onclick="openVoidInvoiceModal('${orderIdStr}')" class="text-red-500 hover:text-red-700 hover:bg-red-50 px-2 py-1.5 rounded-lg text-xs font-bold transition active:scale-95" title="Void invoice">
+          🚫
+        </button>
+      `;
+    } else {
+      const receiptBtnClass = isHighValue
+        ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm'
+        : 'bg-blue-50 hover:bg-blue-100 text-blue-700 shadow-xs';
+      actionButtons = `
+        <button onclick="reprintOrderReceipt('${orderIdStr}')" class="${receiptBtnClass} font-bold px-3.5 py-1.5 rounded-xl text-xs flex items-center space-x-1 transition active:scale-95">
+          <span>🖨️ Receipt</span>
+        </button>
+        <button onclick="openVoidInvoiceModal('${orderIdStr}')" class="text-red-500 hover:text-red-700 hover:bg-red-50 px-2.5 py-1.5 rounded-lg text-xs font-bold transition active:scale-95" title="Void invoice">
+          🚫 Void
+        </button>
+      `;
+    }
+
+    return `
+      <div class="bg-white rounded-2xl p-4 border border-gray-200 shadow-xs hover:shadow-md transition relative space-y-3 ${isHighValue ? 'border-blue-300 ring-1 ring-blue-100' : ''}">
+        ${isHighValue ? `
+          <div class="absolute -top-2.5 right-4 bg-blue-600 text-white text-[9px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full shadow-xs">
+            HIGH VALUE TRANSACTION
+          </div>
+        ` : ''}
+
+        <!-- Top Row: Invoice #, Time, Customer Name & Phone, Status Badges -->
+        <div class="flex items-start justify-between gap-2">
+          <div>
+            <div class="flex items-center space-x-2">
+              <span class="font-mono text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100">
+                ${o.invoice_number}
+              </span>
+              <span class="text-[11px] text-gray-400 font-medium">
+                ${timeStr}
+              </span>
+            </div>
+            <div class="mt-1 text-xs text-gray-900 font-bold">
+              <span>${o.customer_name || 'Walk-in Customer'}</span>
+              ${o.customer_phone ? `<span class="text-gray-400 font-normal"> • ${o.customer_phone}</span>` : ''}
+            </div>
+            ${displayNid ? `<div class="text-[10px] text-gray-400 font-mono">NID: ${displayNid}</div>` : ''}
+            ${isVoid && o.void_reason ? `<div class="text-[10px] text-red-500 italic mt-0.5">Void reason: ${o.void_reason}</div>` : ''}
+          </div>
+
+          <div class="flex flex-col items-end space-y-1">
+            ${statusBadge}
+            ${paymentMethodPill}
+          </div>
+        </div>
+
+        <!-- Financial Metrics Row (TOTAL PRICE | NET PROFIT | DISCOUNT) -->
+        <div class="grid grid-cols-3 gap-2 py-2.5 border-y border-gray-100 text-xs">
+          <div>
+            <span class="text-[10px] font-semibold uppercase tracking-wider text-gray-400 block">${isHandset ? 'TOTAL DEVICE' : 'TOTAL PRICE'}</span>
+            <span class="font-black text-gray-900 text-sm sm:text-base block mt-0.5">${formatMoney(totalAmountVal)}</span>
+          </div>
+          <div class="owner-only-stat">
+            <span class="text-[10px] font-semibold uppercase tracking-wider text-gray-400 block">NET PROFIT</span>
+            <span class="font-black text-emerald-600 text-sm sm:text-base block mt-0.5">+ ${formatMoney(profitVal)}</span>
+          </div>
+          <div class="text-right">
+            <span class="text-[10px] font-semibold uppercase tracking-wider text-gray-400 block">DISCOUNT</span>
+            <span class="font-medium text-gray-600 text-sm sm:text-base block mt-0.5">${discountVal > 0 ? '-' + formatMoney(discountVal) : '৳ 0.00'}</span>
+          </div>
+        </div>
+
+        <!-- Bottom Row: Status text on left, Actions on right -->
+        <div class="flex items-center justify-between pt-0.5">
+          <div class="flex items-center space-x-1.5 text-xs">
+            ${statusSummaryHtml}
+          </div>
+
+          <div class="flex items-center space-x-2">
+            ${actionButtons}
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
 }
 
 async function reprintOrderReceipt(orderId) {

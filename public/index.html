@@ -649,72 +649,90 @@
     <!-- =========================================================
          TAB 3: INVOICES & ORDERS HISTORY
     ========================================================= -->
-    <section id="tab-orders" class="tab-pane hidden space-y-6">
+    <section id="tab-orders" class="tab-pane hidden space-y-4">
       
-      <div class="bg-white rounded-xl shadow-sm p-4 border border-gray-200 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-        <div class="flex items-center space-x-3">
-          <h2 class="text-base font-bold text-gray-800">Sales Transactions &amp; Receipts</h2>
+      <!-- TODAY'S TRANSACTIONS KPI WIDGET (MOCKUP 4) -->
+      <div class="bg-white rounded-2xl p-4 border border-gray-200 shadow-xs space-y-3">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center space-x-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-blue-600 animate-pulse"></span>
+            <span class="text-xs font-black uppercase tracking-wider text-gray-800">TODAY'S TRANSACTIONS</span>
+          </div>
+          <span id="ordersTodayDateBadge" class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
+            Today
+          </span>
         </div>
-        <div class="flex flex-wrap items-center gap-2">
-          <select id="orderEmiFilter" onchange="loadOrdersTable()" class="px-2.5 py-1.5 text-xs bg-white border border-gray-300 rounded-lg focus:ring-1 focus:ring-indigo-500 font-semibold text-gray-700">
-            <option value="">All Transactions</option>
-            <option value="1">💳 All EMI &amp; Installments</option>
-            <option value="active_due">⚠️ Active Installment Dues</option>
-          </select>
+        
+        <div class="grid grid-cols-3 gap-2 sm:gap-3">
+          <!-- Gross Sales -->
+          <div class="bg-gray-50/90 rounded-xl p-2.5 sm:p-3 border border-gray-100">
+            <span class="text-[10px] sm:text-[11px] font-semibold text-gray-500 block">Gross Sales</span>
+            <span id="kpiTodayGross" class="text-sm sm:text-lg font-black text-gray-900 block mt-0.5 truncate">৳ 0</span>
+            <span id="kpiTodayGrossSub" class="text-[10px] font-bold text-emerald-600 block mt-0.5">↑ Today</span>
+          </div>
+
+          <!-- Net Profit -->
+          <div class="bg-gray-50/90 rounded-xl p-2.5 sm:p-3 border border-gray-100 owner-only-stat">
+            <span class="text-[10px] sm:text-[11px] font-semibold text-gray-500 block">Net Profit</span>
+            <span id="kpiTodayProfit" class="text-sm sm:text-lg font-black text-emerald-600 block mt-0.5 truncate">৳ 0</span>
+            <span id="kpiTodayMarginSub" class="text-[10px] font-bold text-emerald-700 block mt-0.5">0% margin</span>
+          </div>
+
+          <!-- Invoices -->
+          <div class="bg-gray-50/90 rounded-xl p-2.5 sm:p-3 border border-gray-100">
+            <span class="text-[10px] sm:text-[11px] font-semibold text-gray-500 block">Invoices</span>
+            <span id="kpiTodayCount" class="text-sm sm:text-lg font-black text-gray-900 block mt-0.5">0</span>
+            <span id="kpiTodayPaidSub" class="text-[10px] font-bold text-blue-600 block mt-0.5">100% Paid</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- SEARCH BAR & FILTER PILLS -->
+      <div class="space-y-2.5">
+        <!-- Search Bar with Scan Icon -->
+        <div class="relative">
           <input
             type="text"
             id="orderSearchInput"
             oninput="debouncedSearchOrders()"
             placeholder="Search invoice #, customer, NID or phone..."
-            class="px-3 py-1.5 text-xs bg-gray-50 border border-gray-300 rounded-lg w-64 focus:bg-white focus:ring-1 focus:ring-indigo-500"
+            class="w-full pl-9 pr-10 py-2.5 text-xs bg-white border border-gray-200 rounded-xl shadow-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
           >
-          <button onclick="exportSalesCsv()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold py-2 px-3 rounded-lg border border-gray-300 transition">
-            Export Sales CSV
+          <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          </div>
+          <button type="button" onclick="startCameraScanForOrders()" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-blue-600 transition" title="Scan Barcode / QR / IMEI">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/></svg>
+          </button>
+        </div>
+
+        <!-- Filter Pills & CSV Export -->
+        <div class="flex items-center justify-between gap-2 overflow-x-auto pb-0.5 no-scrollbar">
+          <div class="flex items-center space-x-1.5 flex-nowrap">
+            <button onclick="filterOrdersTab('all')" id="orderFilterBtn-all" class="cat-pill active bg-blue-600 text-white px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition">
+              All (<span id="ordersCount-all">0</span>)
+            </button>
+            <button onclick="filterOrdersTab('paid')" id="orderFilterBtn-paid" class="cat-pill bg-gray-100 text-gray-700 hover:bg-gray-200 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition">
+              Paid
+            </button>
+            <button onclick="filterOrdersTab('due')" id="orderFilterBtn-due" class="cat-pill bg-gray-100 text-gray-700 hover:bg-gray-200 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition">
+              Due
+            </button>
+            <button onclick="filterOrdersTab('void')" id="orderFilterBtn-void" class="cat-pill bg-gray-100 text-gray-700 hover:bg-gray-200 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition">
+              Returns / Void
+            </button>
+          </div>
+          <button onclick="exportSalesCsv()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold py-1.5 px-3 rounded-full border border-gray-200 transition flex items-center space-x-1 flex-shrink-0 shadow-xs active:scale-95">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+            <span>Export</span>
           </button>
         </div>
       </div>
 
-      <!-- TODAY'S TRANSACTIONS KPI SUMMARY CARD (MOCKUP 4) -->
-      <div id="ordersTodaySummaryCard" class="bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-xl p-4 shadow-sm flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <span class="text-xs font-semibold uppercase tracking-wider text-blue-100">Today's Performance</span>
-          <div class="flex items-baseline space-x-2 mt-1">
-            <span id="kpiTodayGross" class="text-2xl font-black">৳ 0</span>
-            <span class="text-xs text-blue-200">Gross Sales</span>
-          </div>
-        </div>
-        <div class="flex items-center space-x-6 text-xs">
-          <div class="owner-only-stat">
-            <span class="text-blue-200 block">Est. Net Profit</span>
-            <span id="kpiTodayProfit" class="text-base font-extrabold text-emerald-300">৳ 0</span>
-          </div>
-          <div>
-            <span class="text-blue-200 block">Invoices Paid</span>
-            <span id="kpiTodayCount" class="text-base font-extrabold text-white">0 Invoices</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-gray-200 text-left text-xs">
-            <thead class="bg-gray-100 text-gray-700 font-semibold uppercase tracking-wider">
-              <tr>
-                <th class="px-4 py-3">Invoice #</th>
-                <th class="px-4 py-3">Date &amp; Time</th>
-                <th class="px-4 py-3">Customer</th>
-                <th class="px-4 py-3">Payment / Plan</th>
-                <th class="px-4 py-3 text-right">Total Device Price</th>
-                <th class="px-4 py-3 text-right">Discount</th>
-                <th class="px-4 py-3 text-right">Due / Paid</th>
-                <th class="px-4 py-3 text-right owner-only-stat">Net Profit</th>
-                <th class="px-4 py-3 text-center">Actions</th>
-              </tr>
-            </thead>
-            <tbody id="ordersTableBody" class="divide-y divide-gray-200">
-              <tr><td colspan="9" class="text-center py-8 text-gray-400">Loading sales records...</td></tr>
-            </tbody>
-          </table>
+      <!-- INVOICE CARDS CONTAINER (CARD TYPE) -->
+      <div id="ordersCardList" class="space-y-3.5">
+        <div class="text-center py-12 text-gray-400 bg-white rounded-2xl border border-gray-200">
+          <p class="text-sm font-semibold">Loading sales records...</p>
         </div>
       </div>
 
