@@ -1400,51 +1400,99 @@ function startCameraScanForOrders() {
 }
 
 /* =========================================================
-   PRODUCT PHOTO HANDLING & CLIENT-SIDE COMPRESSION
+   PRODUCT PHOTO HANDLING & CLIENT-SIDE COMPRESSION (TARGET: 100 - 150 KB)
 ========================================================= */
+function getDataUrlSizeBytes(dataUrl) {
+  if (!dataUrl || typeof dataUrl !== 'string') return 0;
+  const commaIdx = dataUrl.indexOf(',');
+  if (commaIdx === -1) return dataUrl.length;
+  const base64Len = dataUrl.length - (commaIdx + 1);
+  return Math.round((base64Len * 3) / 4);
+}
+
 function handleProductImageFile(input, prefix = 'item') {
   if (!input.files || !input.files[0]) return;
   const file = input.files[0];
-  compressAndLoadImage(file, (dataUrl) => {
+  showToast('Optimizing photo (<150 KB)...', '⏳');
+  compressAndLoadImage(file, (dataUrl, sizeKb) => {
     setProductImagePreview(prefix, dataUrl);
-    showToast('Product photo attached!', '📷');
+    showToast(`Photo attached: ${sizeKb} KB (Under 150KB)`, '📷');
   });
   input.value = '';
 }
 
-function compressAndLoadImage(file, callback, maxWidth = 600, maxHeight = 600, quality = 0.75) {
+function compressAndLoadImage(file, callback, targetMaxKb = 145, targetMinKb = 85) {
   const reader = new FileReader();
   reader.onload = function(e) {
     const img = new Image();
     img.onload = function() {
-      const canvas = document.createElement('canvas');
+      // 1. Initial dimensions: high definition max 1080px for crisp details of device & packaging
+      let maxDim = 1080;
       let width = img.width;
       let height = img.height;
 
-      if (width > height) {
-        if (width > maxWidth) {
-          height = Math.round((height * maxWidth) / width);
-          width = maxWidth;
-        }
-      } else {
-        if (height > maxHeight) {
-          width = Math.round((width * maxHeight) / height);
-          height = maxHeight;
+      if (width > maxDim || height > maxDim) {
+        if (width > height) {
+          height = Math.round((height * maxDim) / width);
+          width = maxDim;
+        } else {
+          width = Math.round((width * maxDim) / height);
+          height = maxDim;
         }
       }
 
-      canvas.width = width;
-      canvas.height = height;
+      const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, width, height);
 
-      let compressedDataUrl = canvas.toDataURL('image/webp', 0.65);
-      if (!compressedDataUrl.startsWith('data:image/webp')) {
-        compressedDataUrl = canvas.toDataURL('image/jpeg', 0.65);
+      function redrawCanvas(targetW, targetH) {
+        canvas.width = targetW;
+        canvas.height = targetH;
+        // Clean white background to prevent transparent PNGs turning black
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, targetW, targetH);
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, targetW, targetH);
       }
-      callback(compressedDataUrl);
+
+      redrawCanvas(width, height);
+
+      // Check if browser/webview supports WebP
+      const testWebp = canvas.toDataURL('image/webp', 0.85);
+      const mimeType = testWebp.startsWith('data:image/webp') ? 'image/webp' : 'image/jpeg';
+
+      // 2. Iterative optimization to guarantee size strictly under 150 KB (targeting 100-145 KB)
+      let quality = 0.85;
+      let dataUrl = canvas.toDataURL(mimeType, quality);
+      let sizeBytes = getDataUrlSizeBytes(dataUrl);
+      let sizeKb = Math.round(sizeBytes / 1024);
+
+      let attempts = 0;
+      while (sizeKb > targetMaxKb && attempts < 8) {
+        attempts++;
+        if (quality > 0.45) {
+          quality = Math.max(0.40, quality - 0.09);
+        } else {
+          // If quality is already low, reduce resolution by 15%
+          width = Math.round(width * 0.85);
+          height = Math.round(height * 0.85);
+          redrawCanvas(width, height);
+          quality = 0.65;
+        }
+        dataUrl = canvas.toDataURL(mimeType, quality);
+        sizeBytes = getDataUrlSizeBytes(dataUrl);
+        sizeKb = Math.round(sizeBytes / 1024);
+      }
+
+      callback(dataUrl, sizeKb);
+    };
+    img.onerror = function() {
+      showToast('Failed to load image file', '❌');
     };
     img.src = e.target.result;
+  };
+  reader.onerror = function() {
+    showToast('Failed to read image file', '❌');
   };
   reader.readAsDataURL(file);
 }
@@ -1454,6 +1502,7 @@ function setProductImagePreview(prefix, dataUrl) {
   const previewImg = document.getElementById(`${prefix}ImagePreview`);
   const placeholder = document.getElementById(`${prefix}ImagePlaceholder`);
   const removeBtn = document.getElementById(`${prefix}ImageRemoveBtn`);
+  const sizeBadge = document.getElementById(`${prefix}ImageSizeBadge`);
 
   if (hiddenInput) hiddenInput.value = dataUrl || '';
   if (dataUrl) {
@@ -1463,6 +1512,13 @@ function setProductImagePreview(prefix, dataUrl) {
     }
     if (placeholder) placeholder.classList.add('hidden');
     if (removeBtn) removeBtn.classList.remove('hidden');
+
+    if (sizeBadge) {
+      const sizeBytes = getDataUrlSizeBytes(dataUrl);
+      const sizeKb = Math.round(sizeBytes / 1024);
+      sizeBadge.textContent = `📷 ${sizeKb} KB (<150KB)`;
+      sizeBadge.classList.remove('hidden');
+    }
   } else {
     if (previewImg) {
       previewImg.src = '';
@@ -1470,6 +1526,11 @@ function setProductImagePreview(prefix, dataUrl) {
     }
     if (placeholder) placeholder.classList.remove('hidden');
     if (removeBtn) removeBtn.classList.add('hidden');
+
+    if (sizeBadge) {
+      sizeBadge.textContent = '';
+      sizeBadge.classList.add('hidden');
+    }
   }
 }
 

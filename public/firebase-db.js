@@ -235,12 +235,24 @@ const FirebaseDB = {
   },
 
   /**
-   * Client-Side Image Compression (<40 KB WebP)
-   * Prevents Firestore quota bloat and keeps photo sync lightning-fast across mobile data
+   * Client-Side Image Compression (Strictly <150 KB WebP / JPEG)
+   * Keeps photo sync fast while retaining crisp HD quality for device and box labels
    */
-  compressImageToWebP(dataUrlOrFile, maxDimension = 600, quality = 0.6) {
+  compressImageToWebP(dataUrlOrFile, maxDimension = 1080, quality = 0.8) {
     return new Promise((resolve) => {
       if (!dataUrlOrFile) return resolve('');
+
+      // If already an optimized data URL under 150 KB, preserve it directly without re-compression
+      if (typeof dataUrlOrFile === 'string' && dataUrlOrFile.startsWith('data:image/')) {
+        const commaIdx = dataUrlOrFile.indexOf(',');
+        if (commaIdx !== -1) {
+          const base64Len = dataUrlOrFile.length - (commaIdx + 1);
+          const sizeKb = Math.round(((base64Len * 3) / 4) / 1024);
+          if (sizeKb <= 150) {
+            return resolve(dataUrlOrFile);
+          }
+        }
+      }
 
       const processImg = (img) => {
         try {
@@ -259,6 +271,10 @@ const FirebaseDB = {
           canvas.width = width;
           canvas.height = height;
           const ctx = canvas.getContext('2d');
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(0, 0, width, height);
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
           ctx.drawImage(img, 0, 0, width, height);
 
           // Try WebP first; fallback to JPEG

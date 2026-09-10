@@ -947,8 +947,10 @@
                   <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
                   <span>🖼️ From Gallery</span>
                 </button>
+              <div class="flex items-center space-x-2">
+                <p class="text-[11px] text-gray-500">Capture with camera or select from gallery.</p>
+                <span id="itemImageSizeBadge" class="hidden text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full whitespace-nowrap"></span>
               </div>
-              <p class="text-[11px] text-gray-500">Capture with your phone's camera or select from photo gallery.</p>
 
               <!-- Hidden inputs -->
               <input type="file" id="itemImageCameraInput" accept="image/*" capture="environment" class="hidden" onchange="handleProductImageFile(this, 'item')">
@@ -1174,7 +1176,10 @@
                   <span>🖼️ From Gallery</span>
                 </button>
               </div>
-              <p class="text-[11px] text-gray-500">Capture handset / box photo or select from photo gallery.</p>
+              <div class="flex items-center space-x-2">
+                <p class="text-[11px] text-gray-500">Capture handset / box photo or select from gallery.</p>
+                <span id="phoneImageSizeBadge" class="hidden text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full whitespace-nowrap"></span>
+              </div>
 
               <!-- Hidden inputs -->
               <input type="file" id="phoneImageCameraInput" accept="image/*" capture="environment" class="hidden" onchange="handleProductImageFile(this, 'phone')">
