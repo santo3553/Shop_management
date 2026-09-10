@@ -1,6 +1,6 @@
 {
   "name": "biplob-shop-pos",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "Local-first Mobile Phone Retail & Accessories POS & Inventory System",
   "main": "server.js",
   "scripts": {

@@ -7,13 +7,20 @@ const AuthSecurity = {
   SALT: '_biplob_pos_salt_2026_',
   STORAGE_KEY: 'biplob_pos_security_config',
   AUDIT_STORAGE_KEY: 'biplob_pos_audit_logs',
-  AUTO_LOCK_TIMEOUT_MS: 2 * 60 * 1000, // 2 minutes
+  SESSION_STORAGE_KEY: 'biplob_pos_session_role',
+  SESSION_TIMESTAMP_KEY: 'biplob_pos_session_timestamp',
+  CAMERA_INTENT_KEY: 'biplob_pos_camera_intent_active',
+  AUTO_LOCK_TIMEOUT_MS: 3 * 60 * 1000, // 3 minutes idle
+  BACKGROUND_LOCK_TIMEOUT_MS: 3 * 60 * 1000, // 3 minutes in background
 
   // Active session role: 'staff' (default) | 'owner'
   currentRole: 'staff',
   autoLockTimer: null,
   roleListeners: [],
   activeChallengeResolver: null,
+  isIntentOrPickerActive: false,
+  pickerActiveTimeout: null,
+  hiddenAt: null,
 
   // Default salted hashes (Owner: '1234', Staff: '0000')
   // Computed via SHA-256(PIN + SALT)
@@ -21,6 +28,32 @@ const AuthSecurity = {
     ownerPinHash: '',
     staffPinHash: '',
     updatedAt: ''
+  },
+
+  markPickerActive() {
+    this.isIntentOrPickerActive = true;
+    try {
+      sessionStorage.setItem(this.CAMERA_INTENT_KEY, String(Date.now()));
+    } catch (_) {}
+    if (this.pickerActiveTimeout) clearTimeout(this.pickerActiveTimeout);
+    // Keep flag active for up to 3 minutes while camera/gallery is open
+    this.pickerActiveTimeout = setTimeout(() => {
+      this.isIntentOrPickerActive = false;
+      try {
+        sessionStorage.removeItem(this.CAMERA_INTENT_KEY);
+      } catch (_) {}
+    }, 3 * 60 * 1000);
+  },
+
+  clearPickerActive() {
+    // 5-second grace period after camera/gallery returns
+    setTimeout(() => {
+      this.isIntentOrPickerActive = false;
+      try {
+        sessionStorage.removeItem(this.CAMERA_INTENT_KEY);
+      } catch (_) {}
+      if (this.pickerActiveTimeout) clearTimeout(this.pickerActiveTimeout);
+    }, 5000);
   },
 
   /**
@@ -46,10 +79,37 @@ const AuthSecurity = {
     }
     this._saveLocal();
 
-    // Default to Staff Mode on start
-    this.currentRole = 'staff';
-    this._setupAutoLockListeners();
-    this.updateUI();
+    // Check if resuming from an active session or recent camera snap
+    let savedRole = null;
+    let savedTime = 0;
+    let cameraTime = 0;
+    try {
+      savedRole = sessionStorage.getItem(this.SESSION_STORAGE_KEY);
+      savedTime = parseInt(sessionStorage.getItem(this.SESSION_TIMESTAMP_KEY) || '0', 10);
+      cameraTime = parseInt(sessionStorage.getItem(this.CAMERA_INTENT_KEY) || '0', 10);
+    } catch (_) {}
+
+    const now = Date.now();
+    const isRecentCamera = cameraTime && (now - cameraTime < 4 * 60 * 1000);
+    const isRecentSession = savedRole && savedTime && (now - savedTime < 10 * 60 * 1000);
+
+    if (isRecentCamera || isRecentSession) {
+      // Resume active session directly without locking
+      this.currentRole = savedRole || 'owner';
+      this.isAppLocked = false;
+      this.hideLockScreen();
+      this._setupAutoLockListeners();
+      this.updateUI();
+      try {
+        sessionStorage.removeItem(this.CAMERA_INTENT_KEY);
+      } catch (_) {}
+    } else {
+      // Default to Staff Mode on fresh start
+      this.currentRole = 'staff';
+      this._setupAutoLockListeners();
+      this.updateUI();
+      this.showLockScreen();
+    }
 
     // Try synchronizing with Firestore cloud config if available
     this._syncFromCloud();
@@ -61,9 +121,6 @@ const AuthSecurity = {
         this.closePinModal();
       });
     }
-
-    // Launch Unified Security Gate Lock Screen on app start
-    this.showLockScreen();
   },
 
   /**
@@ -344,6 +401,12 @@ const AuthSecurity = {
 
   lockApp() {
     this.currentRole = 'staff';
+    this.isAppLocked = true;
+    try {
+      sessionStorage.removeItem(this.SESSION_STORAGE_KEY);
+      sessionStorage.removeItem(this.SESSION_TIMESTAMP_KEY);
+      sessionStorage.removeItem(this.CAMERA_INTENT_KEY);
+    } catch (_) {}
     this.updateUI();
     this.showLockScreen();
   },
@@ -431,6 +494,11 @@ const AuthSecurity = {
 
   _unlockAsOwner(method = 'PIN') {
     this.currentRole = 'owner';
+    this.isAppLocked = false;
+    try {
+      sessionStorage.setItem(this.SESSION_STORAGE_KEY, 'owner');
+      sessionStorage.setItem(this.SESSION_TIMESTAMP_KEY, String(Date.now()));
+    } catch (_) {}
     this._resetAutoLockTimer();
     this.updateUI();
     this.hideLockScreen();
@@ -442,6 +510,11 @@ const AuthSecurity = {
 
   _unlockAsStaff(method = 'PIN') {
     this.currentRole = 'staff';
+    this.isAppLocked = false;
+    try {
+      sessionStorage.setItem(this.SESSION_STORAGE_KEY, 'staff');
+      sessionStorage.setItem(this.SESSION_TIMESTAMP_KEY, String(Date.now()));
+    } catch (_) {}
     this.updateUI();
     this.hideLockScreen();
     this._notifyListeners();
@@ -477,7 +550,7 @@ const AuthSecurity = {
   },
 
   /**
-   * Auto-Lock setup: drops to Staff mode and locks screen after 2 minutes of idle inactivity
+   * Auto-Lock setup: drops to Staff mode and locks screen after idle inactivity
    */
   _setupAutoLockListeners() {
     const resetTimer = () => {
@@ -490,10 +563,41 @@ const AuthSecurity = {
       window.addEventListener(evt, resetTimer, { passive: true });
     });
 
-    // Auto-lock when phone screen turns off or app is minimized
+    // Automatically guard any file input interactions across the entire app
+    document.addEventListener('click', (e) => {
+      const target = e.target;
+      if (target && (target.matches('input[type="file"]') || target.closest('input[type="file"]') || (target.id && (target.id.includes('Camera') || target.id.includes('Gallery'))))) {
+        this.markPickerActive();
+      }
+    }, true);
+
+    document.addEventListener('change', (e) => {
+      const target = e.target;
+      if (target && target.matches('input[type="file"]')) {
+        this.clearPickerActive();
+      }
+    }, true);
+
+    // Auto-lock when phone screen turns off or app is minimized for > BACKGROUND_LOCK_TIMEOUT_MS
     document.addEventListener('visibilitychange', () => {
-      if (document.hidden && !this.isAppLocked) {
-        this.lockApp();
+      if (document.hidden) {
+        this.hiddenAt = Date.now();
+      } else {
+        if (this.hiddenAt) {
+          const elapsed = Date.now() - this.hiddenAt;
+          this.hiddenAt = null;
+
+          // If camera, gallery or barcode scanner was active, or was minimized for < 3m, NEVER LOCK!
+          if (this.isIntentOrPickerActive) {
+            this.clearPickerActive();
+            return;
+          }
+
+          if (elapsed >= this.BACKGROUND_LOCK_TIMEOUT_MS && !this.isAppLocked) {
+            this.lockApp();
+            if (window.showToast) window.showToast('Session locked after 3m in background.', '🔒');
+          }
+        }
       }
     });
 
@@ -515,7 +619,7 @@ const AuthSecurity = {
     this.autoLockTimer = setTimeout(() => {
       if (this.isOwner() && !this.isAppLocked) {
         this.lockApp();
-        if (window.showToast) window.showToast('Auto-locked to Security Screen after 2m idle.', '🔒');
+        if (window.showToast) window.showToast('Auto-locked to Security Screen after 3m idle.', '🔒');
       }
     }, this.AUTO_LOCK_TIMEOUT_MS);
   },

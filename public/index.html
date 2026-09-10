@@ -31,6 +31,9 @@
       </div>
       <h2 class="text-xl sm:text-2xl font-black tracking-tight text-white">Mobile Decor &amp; Tech</h2>
       <p class="text-xs text-indigo-300 mt-0.5 font-medium">Smartphones &amp; Accessories • Terminal Security</p>
+      <div class="mt-1 flex items-center justify-center space-x-1.5">
+        <span class="text-[10px] font-bold text-indigo-300 bg-indigo-950/80 border border-indigo-500/40 px-2.5 py-0.5 rounded-full tracking-wider shadow-inner">v1.2.0</span>
+      </div>
       
       <div class="mt-4 sm:mt-6 flex flex-col items-center">
         <div class="flex items-center space-x-1.5 text-xs text-indigo-200 bg-indigo-900/60 border border-indigo-700/50 px-3 py-1 rounded-full shadow-inner">
@@ -107,6 +110,7 @@
             <div class="flex items-center space-x-1">
               <h1 class="text-xs sm:text-sm md:text-base font-black tracking-tight text-gray-900 whitespace-nowrap">Mobile Decor &amp; Tech</h1>
               <span class="text-[9px] sm:text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.2 sm:py-0.5 rounded font-bold border border-blue-100 flex-shrink-0">POS</span>
+              <span class="text-[9px] sm:text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.2 sm:py-0.5 rounded font-bold border border-gray-200 flex-shrink-0">v1.2.0</span>
             </div>
             <p id="appHeaderSubtitle" class="text-[10px] sm:text-[11px] text-gray-500 font-medium truncate">POS Terminal</p>
           </div>
@@ -931,7 +935,7 @@
                 <!-- Direct Camera Capture -->
                 <button
                   type="button"
-                  onclick="document.getElementById('itemImageCameraInput').click()"
+                  onclick="triggerItemCameraSnap()"
                   class="bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm flex items-center space-x-1.5 transition"
                 >
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
@@ -941,12 +945,13 @@
                 <!-- Choose from Gallery -->
                 <button
                   type="button"
-                  onclick="document.getElementById('itemImageGalleryInput').click()"
+                  onclick="triggerItemGallery()"
                   class="bg-white hover:bg-gray-100 active:bg-gray-200 text-gray-700 text-xs font-semibold py-1.5 px-3 rounded-lg border border-gray-300 shadow-sm flex items-center space-x-1.5 transition"
                 >
                   <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
                   <span>🖼️ From Gallery</span>
                 </button>
+              </div>
               <div class="flex items-center space-x-2">
                 <p class="text-[11px] text-gray-500">Capture with camera or select from gallery.</p>
                 <span id="itemImageSizeBadge" class="hidden text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full whitespace-nowrap"></span>
@@ -1159,7 +1164,7 @@
                 <!-- Direct Camera Capture -->
                 <button
                   type="button"
-                  onclick="document.getElementById('phoneImageCameraInput').click()"
+                  onclick="triggerPhoneCameraSnap()"
                   class="bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm flex items-center space-x-1.5 transition"
                 >
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
@@ -1169,7 +1174,7 @@
                 <!-- Choose from Gallery -->
                 <button
                   type="button"
-                  onclick="document.getElementById('phoneImageGalleryInput').click()"
+                  onclick="triggerPhoneGallery()"
                   class="bg-white hover:bg-gray-100 active:bg-gray-200 text-gray-700 text-xs font-semibold py-1.5 px-3 rounded-lg border border-gray-300 shadow-sm flex items-center space-x-1.5 transition"
                 >
                   <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>

@@ -1399,9 +1399,40 @@ function startCameraScanForOrders() {
   }
 }
 
+const APP_VERSION = '1.2.0';
+window.APP_VERSION = APP_VERSION;
+
 /* =========================================================
    PRODUCT PHOTO HANDLING & CLIENT-SIDE COMPRESSION (TARGET: 100 - 150 KB)
 ========================================================= */
+function triggerItemCameraSnap() {
+  if (window.AuthSecurity && typeof window.AuthSecurity.markPickerActive === 'function') {
+    window.AuthSecurity.markPickerActive();
+  }
+  document.getElementById('itemImageCameraInput')?.click();
+}
+
+function triggerItemGallery() {
+  if (window.AuthSecurity && typeof window.AuthSecurity.markPickerActive === 'function') {
+    window.AuthSecurity.markPickerActive();
+  }
+  document.getElementById('itemImageGalleryInput')?.click();
+}
+
+function triggerPhoneCameraSnap() {
+  if (window.AuthSecurity && typeof window.AuthSecurity.markPickerActive === 'function') {
+    window.AuthSecurity.markPickerActive();
+  }
+  document.getElementById('phoneImageCameraInput')?.click();
+}
+
+function triggerPhoneGallery() {
+  if (window.AuthSecurity && typeof window.AuthSecurity.markPickerActive === 'function') {
+    window.AuthSecurity.markPickerActive();
+  }
+  document.getElementById('phoneImageGalleryInput')?.click();
+}
+
 function getDataUrlSizeBytes(dataUrl) {
   if (!dataUrl || typeof dataUrl !== 'string') return 0;
   const commaIdx = dataUrl.indexOf(',');
@@ -1411,6 +1442,9 @@ function getDataUrlSizeBytes(dataUrl) {
 }
 
 function handleProductImageFile(input, prefix = 'item') {
+  if (window.AuthSecurity && typeof window.AuthSecurity.clearPickerActive === 'function') {
+    window.AuthSecurity.clearPickerActive();
+  }
   if (!input.files || !input.files[0]) return;
   const file = input.files[0];
   showToast('Optimizing photo (<150 KB)...', '⏳');
