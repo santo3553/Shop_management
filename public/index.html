@@ -40,7 +40,6 @@
           <span class="text-sm">🔒</span>
           <span class="font-semibold tracking-wide">Enter PIN to Unlock</span>
         </div>
-        <p class="text-[11px] text-gray-400 mt-1.5">Owner PIN (1234) • Staff PIN (0000)</p>
       </div>
 
       <!-- PIN Indicator Dots -->
@@ -1634,11 +1633,30 @@
         </div>
       </div>
 
+      <!-- Owner Fingerprint Device Enrollment -->
+      <div class="border border-indigo-200 bg-indigo-50/50 rounded-xl p-3 space-y-2">
+        <div class="font-bold text-indigo-950 flex items-center justify-between">
+          <span class="flex items-center space-x-1">
+            <span>👆</span>
+            <span>Owner Fingerprint (This Device)</span>
+          </span>
+          <span id="secBiometricStatusBadge" class="text-[10px] bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full font-bold">
+            Disabled
+          </span>
+        </div>
+        <p class="text-[11px] text-gray-600">
+          Prevents staff from unlocking Owner Mode with their own fingerprint. Fingerprint unlock only works on devices explicitly enrolled here with the Owner PIN.
+        </p>
+        <div id="secBiometricActionContainer" class="pt-1 flex items-center gap-2">
+          <!-- Button injected by JS -->
+        </div>
+      </div>
+
       <!-- Change Owner PIN -->
       <div class="border border-gray-200 rounded-xl p-3 space-y-2">
         <div class="font-bold text-gray-800 flex items-center space-x-1">
           <span>👑</span>
-          <span>Change Owner PIN (Default: 1234)</span>
+          <span>Change Owner PIN</span>
         </div>
         <p class="text-[11px] text-gray-500">Owner PIN protects profit reports, invoice voiding, database resets, and high discounts.</p>
         <div class="grid grid-cols-3 gap-1.5 pt-1">
@@ -1654,7 +1672,7 @@
       <div class="border border-gray-200 rounded-xl p-3 space-y-2">
         <div class="font-bold text-gray-800 flex items-center space-x-1">
           <span>👤</span>
-          <span>Change Staff PIN (Default: 0000)</span>
+          <span>Change Staff PIN</span>
         </div>
         <p class="text-[11px] text-gray-500">Used by sales floor employees to operate the register.</p>
         <div class="grid grid-cols-3 gap-1.5 pt-1">

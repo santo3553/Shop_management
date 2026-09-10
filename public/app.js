@@ -3370,6 +3370,10 @@ function openSecurityModal() {
   if (staffAuthInp) staffAuthInp.value = '';
   if (newStaffInp) newStaffInp.value = '';
 
+  if (window.AuthSecurity && typeof window.AuthSecurity.updateBiometricSettingsUI === 'function') {
+    window.AuthSecurity.updateBiometricSettingsUI();
+  }
+
   openModal('modalSecuritySettings');
 }
 

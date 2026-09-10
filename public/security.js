@@ -166,6 +166,11 @@ const AuthSecurity = {
     }
     this.credentials.ownerPinHash = await this.hashPin(newPin);
     this.credentials.updatedAt = new Date().toISOString();
+    // Invalidate any previously enrolled biometric tokens on PIN change
+    try {
+      localStorage.removeItem(this.BIOMETRIC_TOKEN_KEY);
+      this.updateBiometricSettingsUI();
+    } catch (_) {}
     this._saveLocal();
     await this._syncToCloud();
     await this.logAudit('OWNER_PIN_CHANGED', 'Owner PIN was updated successfully');
@@ -376,17 +381,6 @@ const AuthSecurity = {
       errEl.classList.add('hidden');
       errEl.style.setProperty('display', 'none', 'important');
     }
-
-    // Prompt native biometric prompt if available on device
-    setTimeout(() => {
-      try {
-        if (window.AndroidBiometricBridge && typeof window.AndroidBiometricBridge.isBiometricAvailable === 'function') {
-          if (window.AndroidBiometricBridge.isBiometricAvailable()) {
-            window.AndroidBiometricBridge.promptBiometric();
-          }
-        }
-      } catch (_) {}
-    }, 400);
   },
 
   hideLockScreen() {
@@ -523,19 +517,120 @@ const AuthSecurity = {
     this.logAudit('STAFF_UNLOCK', `Unlocked via ${method}`);
   },
 
+  BIOMETRIC_TOKEN_KEY: 'biplob_pos_owner_biometric_token',
+  biometricActionInProgress: null, // 'enroll' | 'unlock' | null
+
+  /**
+   * Checks if Owner has explicitly enrolled fingerprint on this device
+   */
+  isOwnerBiometricEnrolled() {
+    try {
+      const token = localStorage.getItem(this.BIOMETRIC_TOKEN_KEY);
+      if (!token || !this.credentials.ownerPinHash) return false;
+      const expectedToken = this._computeBiometricToken(this.credentials.ownerPinHash);
+      return token === expectedToken;
+    } catch (_) {
+      return false;
+    }
+  },
+
+  _computeBiometricToken(ownerPinHash) {
+    let hash = 0;
+    const str = ownerPinHash + '_enrolled_device_fingerprint_' + this.SALT;
+    for (let i = 0; i < str.length; i++) {
+      hash = ((hash << 5) - hash) + str.charCodeAt(i);
+      hash |= 0;
+    }
+    return 'bio_tok_' + Math.abs(hash).toString(16) + '_' + ownerPinHash.substring(0, 8);
+  },
+
+  /**
+   * Owner explicitly enrolls this device's fingerprint
+   */
+  async enrollOwnerBiometric() {
+    if (!this.isOwner()) {
+      const authorized = await this.requestOwnerRole('Authorize Fingerprint Enrollment');
+      if (!authorized) {
+        if (window.showToast) window.showToast('Owner authorization required to enroll fingerprint', '❌');
+        return false;
+      }
+    }
+
+    if (!window.AndroidBiometricBridge || typeof window.AndroidBiometricBridge.isBiometricAvailable !== 'function' || !window.AndroidBiometricBridge.isBiometricAvailable()) {
+      if (window.showToast) window.showToast('Fingerprint hardware sensor not available on this device', '⚠️');
+      return false;
+    }
+
+    this.biometricActionInProgress = 'enroll';
+    window.AndroidBiometricBridge.promptBiometric();
+  },
+
+  /**
+   * Owner disables/removes fingerprint from this device
+   */
+  async disableOwnerBiometric() {
+    if (!this.isOwner()) {
+      const authorized = await this.requestOwnerRole('Authorize Disabling Fingerprint');
+      if (!authorized) return false;
+    }
+
+    localStorage.removeItem(this.BIOMETRIC_TOKEN_KEY);
+    this.updateBiometricSettingsUI();
+    if (window.showToast) window.showToast('Owner fingerprint unlock removed from this device', '🗑️');
+    await this.logAudit('BIOMETRIC_DISABLED', 'Owner removed fingerprint authorization from this device');
+    return true;
+  },
+
+  /**
+   * Triggered when user taps fingerprint button on the lock screen
+   */
   triggerBiometric() {
+    // If Owner fingerprint is NOT enrolled on this device, reject immediately!
+    if (!this.isOwnerBiometricEnrolled()) {
+      const errEl = document.getElementById('lockScreenError');
+      if (errEl) {
+        errEl.textContent = '🔒 Owner fingerprint is not registered on this device. Enter Owner PIN.';
+        errEl.classList.remove('hidden');
+        errEl.style.setProperty('display', 'flex', 'important');
+      }
+      this._shakeLockScreen();
+      if (window.showToast) window.showToast('Owner fingerprint not enrolled on this device. Please enter Owner PIN.', '⚠️');
+      return;
+    }
+
     if (window.AndroidBiometricBridge && typeof window.AndroidBiometricBridge.promptBiometric === 'function') {
+      this.biometricActionInProgress = 'unlock';
       window.AndroidBiometricBridge.promptBiometric();
     } else {
-      if (window.showToast) window.showToast('Fingerprint sensor not available on this device. Please enter PIN.', 'ℹ️');
+      if (window.showToast) window.showToast('Fingerprint sensor not available. Please enter PIN.', 'ℹ️');
     }
   },
 
   onBiometricSuccess() {
-    this._unlockAsOwner('Fingerprint / Biometrics');
+    if (this.biometricActionInProgress === 'enroll') {
+      this.biometricActionInProgress = null;
+      const token = this._computeBiometricToken(this.credentials.ownerPinHash);
+      localStorage.setItem(this.BIOMETRIC_TOKEN_KEY, token);
+      this.updateBiometricSettingsUI();
+      if (window.showToast) window.showToast('Owner fingerprint successfully enrolled on this device! 👆', '✅');
+      this.logAudit('BIOMETRIC_ENROLLED', 'Owner fingerprint enrolled on device');
+      return;
+    }
+
+    // Otherwise it is an unlock attempt: verify enrollment strictly!
+    if (!this.isOwnerBiometricEnrolled()) {
+      this.biometricActionInProgress = null;
+      if (window.showToast) window.showToast('Access Denied: Owner fingerprint not enrolled on this device.', '❌');
+      this._shakeLockScreen();
+      return;
+    }
+
+    this.biometricActionInProgress = null;
+    this._unlockAsOwner('Enrolled Fingerprint');
   },
 
   onBiometricFailed() {
+    this.biometricActionInProgress = null;
     const errEl = document.getElementById('lockScreenError');
     if (errEl) {
       errEl.textContent = '❌ Fingerprint not recognized. Try again or enter PIN.';
@@ -546,7 +641,36 @@ const AuthSecurity = {
   },
 
   onBiometricError(err) {
+    this.biometricActionInProgress = null;
     console.warn('Biometric notice:', err);
+  },
+
+  updateBiometricSettingsUI() {
+    const badge = document.getElementById('secBiometricStatusBadge');
+    const container = document.getElementById('secBiometricActionContainer');
+    if (!badge || !container) return;
+
+    const isEnrolled = this.isOwnerBiometricEnrolled();
+    const isHardwareAvailable = window.AndroidBiometricBridge && typeof window.AndroidBiometricBridge.isBiometricAvailable === 'function' && window.AndroidBiometricBridge.isBiometricAvailable();
+
+    if (isEnrolled) {
+      badge.className = 'text-[10px] bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full font-bold';
+      badge.textContent = '🟢 Enrolled & Active';
+      container.innerHTML = `
+        <button type="button" onclick="AuthSecurity.disableOwnerBiometric()" class="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 font-bold rounded-lg border border-red-200 transition text-xs flex items-center space-x-1 shadow-xs active:scale-95">
+          <span>🚫 Disable Fingerprint on this Device</span>
+        </button>
+      `;
+    } else {
+      badge.className = 'text-[10px] bg-gray-100 text-gray-600 px-2.5 py-0.5 rounded-full font-bold';
+      badge.textContent = '⚪ Disabled / Not Enrolled';
+      container.innerHTML = `
+        <button type="button" onclick="AuthSecurity.enrollOwnerBiometric()" class="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg shadow-sm transition text-xs flex items-center space-x-1 active:scale-95">
+          <span>👆 Enroll Owner Fingerprint</span>
+        </button>
+        ${!isHardwareAvailable ? '<span class="text-[10px] text-gray-400 italic">(Fingerprint sensor needed)</span>' : ''}
+      `;
+    }
   },
 
   /**
@@ -683,6 +807,9 @@ const AuthSecurity = {
     if (!this.isAppLocked) {
       this.hideLockScreen();
     }
+
+    // 5. Update Biometric Enrollment status UI in Security Settings
+    this.updateBiometricSettingsUI();
   },
 
   onRoleChange(cb) {
