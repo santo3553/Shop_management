@@ -535,6 +535,14 @@ const MobileDB = {
     };
   },
 
+  deleteOrder(orderId) {
+    const key = String(orderId).trim();
+    let orders = this._get(this.KEYS.ORDERS);
+    orders = orders.filter(o => String(o.id) !== key && String(o.invoice_number) !== key);
+    this._set(this.KEYS.ORDERS, orders);
+    return true;
+  },
+
   exportBackup() {
     return {
       format: 'BIPLOB_SHOP_POS_BACKUP',
@@ -747,9 +755,14 @@ const MobileDB = {
       }
 
       const orderMatch = pathname.match(/^\/api\/orders\/([^\/]+)$/);
-      if (orderMatch && method === 'GET') {
+      if (orderMatch) {
         const id = orderMatch[1];
-        return this._json(this.getOrderById(id));
+        if (method === 'GET') {
+          return this._json(this.getOrderById(id));
+        } else if (method === 'DELETE') {
+          this.deleteOrder(id);
+          return this._json({ success: true, message: 'Order deleted permanently.' });
+        }
       }
 
       // 6. EMI
@@ -859,7 +872,16 @@ const MobileDB = {
         });
       }
 
-      // 8. System info
+      // 8. Admin Reset Demo Data
+      if (pathname === '/api/admin/reset-demo-data' && method === 'POST') {
+        this._set(this.KEYS.ITEMS, []);
+        this._set(this.KEYS.PHONES, []);
+        this._set(this.KEYS.ORDERS, []);
+        this._set(this.KEYS.PAYMENTS, []);
+        return this._json({ success: true, message: 'All local demo data cleared.' });
+      }
+
+      // 9. System info
       if (pathname === '/api/system/network-info' || pathname === '/api/system/info') {
         return this._json({
           server_ip: 'Mobile Localhost',

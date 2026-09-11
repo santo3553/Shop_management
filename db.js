@@ -218,9 +218,9 @@ function seedInitialData() {
     insertCategory.run(cat);
   }
 
-  // Check if we need sample starter stock
+  // Check if we need sample starter stock (only on true initial first run)
   const itemCount = db.prepare('SELECT COUNT(*) as count FROM items').get().count;
-  if (itemCount === 0) {
+  if (isFirstRun && itemCount === 0) {
     const catMap = {};
     db.prepare('SELECT id, name FROM categories').all().forEach(c => {
       catMap[c.name] = c.id;
@@ -248,9 +248,9 @@ function seedInitialData() {
     }
   }
 
-  // Seed sample used phones if empty
+  // Seed sample used phones if empty (only on true initial first run)
   const phoneCount = db.prepare('SELECT COUNT(*) as count FROM phones').get().count;
-  if (phoneCount === 0) {
+  if (isFirstRun && phoneCount === 0) {
     const samplePhones = [
       { imei: '354890102938471', brand: 'Apple', model: 'iPhone 13 Pro', storage: '128GB', color: 'Sierra Blue', grade: 'Grade A', battery: 89, cost: 55000, price: 68000, status: 'In-Stock', notes: 'Original screen, minor frame scuff' },
       { imei: '358721094837261', brand: 'Apple', model: 'iPhone 12', storage: '64GB', color: 'Black', grade: 'Grade B', battery: 84, cost: 32000, price: 41000, status: 'In-Stock', notes: 'FaceID working, battery serviced' },

@@ -83,6 +83,12 @@ const FirebaseDB = {
       this._setupNetworkListeners();
       this.startRealtimeSync();
       this._updateStatusUI();
+
+      // Targeted cleanup for ghost test item "bal"
+      setTimeout(() => {
+        try { this._purgeTestItemBal(); } catch (_) {}
+      }, 1500);
+
       return true;
     } catch (err) {
       console.error('Firebase initialization error:', err);
@@ -148,10 +154,8 @@ const FirebaseDB = {
     });
     this.unsubscribers = [];
 
-    let hasCheckedAutoMigrate = false;
-
     // 1. Sync Accessories (items collection)
-    const unsubItems = this.db.collection('items').onSnapshot(async (snapshot) => {
+    const unsubItems = this.db.collection('items').onSnapshot((snapshot) => {
       const items = [];
       snapshot.forEach(doc => {
         items.push({ id: doc.id, ...doc.data() });
@@ -160,22 +164,6 @@ const FirebaseDB = {
       this.syncState = snapshot.metadata.fromCache ? (navigator.onLine ? 'connected' : 'offline') : 'connected';
       this._updateStatusUI();
       this._notifyListeners('items', items);
-
-      // Auto-upload local products if Firestore is fresh/empty
-      if (!hasCheckedAutoMigrate && snapshot.empty && window.MobileDB) {
-        hasCheckedAutoMigrate = true;
-        const localItems = window.MobileDB._get(window.MobileDB.KEYS.ITEMS);
-        const localPhones = window.MobileDB._get(window.MobileDB.KEYS.PHONES);
-        if ((localItems && localItems.length > 0) || (localPhones && localPhones.length > 0)) {
-          console.log('[FirebaseDB] Fresh cloud database detected. Auto-uploading local inventory...');
-          try {
-            await this.migrateFromLocalDB();
-            console.log('[FirebaseDB] Auto-upload complete!');
-          } catch (mErr) {
-            console.warn('[FirebaseDB] Auto-upload note:', mErr);
-          }
-        }
-      }
     }, (err) => {
       console.warn('Firestore items sync notice:', err);
     });
@@ -681,9 +669,23 @@ const FirebaseDB = {
   },
 
   async deleteAccessory(id) {
-    if (!this.isConfigured()) throw new Error('Firebase not configured');
-    await this.db.collection('items').doc(String(id)).delete();
-    return { success: true };
+    const docId = String(id).trim();
+    if (this.db) {
+      try {
+        await this.db.collection('items').doc(docId).delete();
+      } catch (err) {
+        console.warn('Firestore deleteAccessory note:', err);
+      }
+    }
+    this.cache.items = (this.cache.items || []).filter(i => String(i.id) !== docId);
+    if (window.MobileDB) {
+      try {
+        window.MobileDB.deleteItem(id);
+        window.MobileDB.deleteItem(docId);
+      } catch (_) {}
+    }
+    this._notifyListeners('items', this.cache.items);
+    return { success: true, message: 'Accessory deleted successfully.' };
   },
 
   // --- MOBILE HANDSET (IMEI) OPERATIONS ---
@@ -738,9 +740,120 @@ const FirebaseDB = {
   },
 
   async deletePhone(idOrImei) {
-    if (!this.isConfigured()) throw new Error('Firebase not configured');
-    await this.db.collection('phones').doc(String(idOrImei).trim()).delete();
-    return { success: true };
+    const key = String(idOrImei).trim();
+    if (this.db) {
+      try {
+        await this.db.collection('phones').doc(key).delete();
+      } catch (err) {
+        console.warn('Firestore deletePhone note:', err);
+      }
+    }
+    this.cache.phones = (this.cache.phones || []).filter(p => String(p.id) !== key && String(p.imei_number) !== key);
+    if (window.MobileDB) {
+      try {
+        window.MobileDB.deletePhone(key);
+      } catch (_) {}
+    }
+    this._notifyListeners('phones', this.cache.phones);
+    return { success: true, message: 'Handset deleted successfully.' };
+  },
+
+  async deleteOrder(orderId) {
+    const key = String(orderId).trim();
+    if (this.db) {
+      const order = (this.cache.orders || []).find(o => String(o.id) === key || String(o.invoice_number) === key);
+      const docId = order ? (order.invoice_number || String(order.id)) : key;
+      try {
+        await this.db.collection('orders').doc(docId).delete();
+        if (order && order.id && order.invoice_number && String(order.id) !== String(order.invoice_number)) {
+          await this.db.collection('orders').doc(String(order.id)).delete();
+        }
+      } catch (err) {
+        console.warn('Firestore deleteOrder note:', err);
+      }
+    }
+    this.cache.orders = (this.cache.orders || []).filter(o => String(o.id) !== key && String(o.invoice_number) !== key);
+    if (window.MobileDB) {
+      try {
+        window.MobileDB.deleteOrder(key);
+      } catch (_) {}
+    }
+    this._notifyListeners('orders', this.cache.orders);
+    return { success: true, message: `Invoice ${key} permanently deleted.` };
+  },
+
+  async resetAllShopData() {
+    if (this.db) {
+      const collections = ['items', 'phones', 'orders'];
+      for (const col of collections) {
+        try {
+          const snapshot = await this.db.collection(col).get();
+          if (!snapshot.empty) {
+            const batch = this.db.batch();
+            snapshot.docs.forEach(d => batch.delete(d.ref));
+            await batch.commit();
+          }
+        } catch (e) {
+          console.warn(`Error wiping Firestore ${col}:`, e);
+        }
+      }
+    }
+
+    this.cache.items = [];
+    this.cache.phones = [];
+    this.cache.orders = [];
+
+    if (window.MobileDB) {
+      window.MobileDB._set(window.MobileDB.KEYS.ITEMS, []);
+      window.MobileDB._set(window.MobileDB.KEYS.PHONES, []);
+      window.MobileDB._set(window.MobileDB.KEYS.ORDERS, []);
+      window.MobileDB._set(window.MobileDB.KEYS.PAYMENTS, []);
+    }
+
+    try {
+      localStorage.setItem('biplob_shop_data_cleared', 'true');
+    } catch (_) {}
+
+    this._notifyListeners('items', []);
+    this._notifyListeners('phones', []);
+    this._notifyListeners('orders', []);
+
+    return { success: true, message: 'All inventory, phones, and sales invoices have been completely wiped clean!' };
+  },
+
+  async _purgeTestItemBal() {
+    try {
+      // 1. Check local MobileDB items
+      if (window.MobileDB) {
+        let localItems = window.MobileDB._get(window.MobileDB.KEYS.ITEMS);
+        const hasBal = localItems.some(i => (i.title || '').trim().toLowerCase() === 'bal');
+        if (hasBal) {
+          localItems = localItems.filter(i => (i.title || '').trim().toLowerCase() !== 'bal');
+          window.MobileDB._set(window.MobileDB.KEYS.ITEMS, localItems);
+        }
+
+        let localOrders = window.MobileDB._get(window.MobileDB.KEYS.ORDERS);
+        const hasBalOrder = localOrders.some(o => (o.items || []).some(it => (it.title || it.name || '').trim().toLowerCase() === 'bal'));
+        if (hasBalOrder) {
+          localOrders = localOrders.filter(o => !(o.items || []).some(it => (it.title || it.name || '').trim().toLowerCase() === 'bal'));
+          window.MobileDB._set(window.MobileDB.KEYS.ORDERS, localOrders);
+        }
+      }
+
+      // 2. Check Firestore and cache items
+      const balItems = (this.cache.items || []).filter(i => (i.title || '').trim().toLowerCase() === 'bal');
+      for (const item of balItems) {
+        await this.deleteAccessory(item.id);
+      }
+
+      // 3. Check Firestore and cache orders
+      const balOrders = (this.cache.orders || []).filter(o => (o.items || []).some(it => (it.title || it.name || '').trim().toLowerCase() === 'bal'));
+      for (const order of balOrders) {
+        await this.deleteOrder(order.id || order.invoice_number);
+      }
+    } catch (e) {
+      console.warn('Notice during test item purge:', e);
+    }
   },
 
   async checkImei(imei) {
@@ -1196,11 +1309,15 @@ const FirebaseDB = {
       }
 
       const orderMatch = pathname.match(/^\/api\/orders\/([^/]+)$/);
-      if (orderMatch && method === 'GET') {
+      if (orderMatch) {
         const id = orderMatch[1];
-        const found = this.cache.orders.find(o => String(o.id) === id || o.invoice_number === id);
-        if (!found) return this._json({ error: 'Order not found' }, 404);
-        return this._json(found);
+        if (method === 'GET') {
+          const found = this.cache.orders.find(o => String(o.id) === id || o.invoice_number === id);
+          if (!found) return this._json({ error: 'Order not found' }, 404);
+          return this._json(found);
+        } else if (method === 'DELETE') {
+          return this._json(await this.deleteOrder(id));
+        }
       }
 
       // 7. EMI Collection
@@ -1366,6 +1483,11 @@ const FirebaseDB = {
             'Content-Disposition': `attachment; filename="outofstock-products-${Date.now()}.csv"`
           }
         });
+      }
+
+      // 11. Admin Reset / Clear All Shop Data
+      if (pathname === '/api/admin/reset-demo-data' && method === 'POST') {
+        return this._json(await this.resetAllShopData());
       }
 
       // Fallback

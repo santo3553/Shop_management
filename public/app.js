@@ -2552,6 +2552,9 @@ function renderOrdersCards() {
         <button onclick="reprintOrderReceipt('${orderIdStr}')" class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold px-3 py-1.5 rounded-xl text-xs flex items-center space-x-1 transition shadow-xs">
           <span>🖨️ Receipt</span>
         </button>
+        <button onclick="deleteInvoice('${orderIdStr}')" class="text-red-500 hover:text-red-700 hover:bg-red-50 px-2 py-1.5 rounded-lg text-xs font-bold transition active:scale-95" title="Permanently delete invoice">
+          🗑️
+        </button>
       `;
     } else if (hasDue) {
       actionButtons = `
@@ -2564,6 +2567,9 @@ function renderOrdersCards() {
         <button onclick="openVoidInvoiceModal('${orderIdStr}')" class="text-red-500 hover:text-red-700 hover:bg-red-50 px-2 py-1.5 rounded-lg text-xs font-bold transition active:scale-95" title="Void invoice">
           🚫
         </button>
+        <button onclick="deleteInvoice('${orderIdStr}')" class="text-gray-400 hover:text-red-600 hover:bg-red-50 px-2 py-1.5 rounded-lg text-xs font-bold transition active:scale-95" title="Permanently delete invoice">
+          🗑️
+        </button>
       `;
     } else {
       const receiptBtnClass = isHighValue
@@ -2575,6 +2581,9 @@ function renderOrdersCards() {
         </button>
         <button onclick="openVoidInvoiceModal('${orderIdStr}')" class="text-red-500 hover:text-red-700 hover:bg-red-50 px-2.5 py-1.5 rounded-lg text-xs font-bold transition active:scale-95" title="Void invoice">
           🚫 Void
+        </button>
+        <button onclick="deleteInvoice('${orderIdStr}')" class="text-gray-400 hover:text-red-600 hover:bg-red-50 px-2.5 py-1.5 rounded-lg text-xs font-bold transition active:scale-95" title="Permanently delete invoice">
+          🗑️
         </button>
       `;
     }
@@ -3093,25 +3102,58 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
+async function deleteInvoice(orderId) {
+  if (window.AuthSecurity && !window.AuthSecurity.isOwner()) {
+    const authorized = await window.AuthSecurity.requestOwnerRole('Authorize Invoice Deletion');
+    if (!authorized) {
+      showToast('Owner PIN required to delete invoice.', '🔒');
+      return;
+    }
+  }
+
+  const confirmed = confirm(`Are you sure you want to PERMANENTLY delete Invoice ${orderId}?\n\nThis will remove it completely from all sales records, inventory, and reports.`);
+  if (!confirmed) return;
+
+  try {
+    showToast('Deleting invoice...', '⏳');
+    const res = await fetch(`/api/orders/${encodeURIComponent(orderId)}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (res.ok) {
+      showToast(data.message || 'Invoice deleted permanently', '🗑️');
+      await loadOrdersTable();
+      if (typeof loadReports === 'function') loadReports();
+    } else {
+      showToast(data.error || 'Failed to delete invoice', '❌');
+    }
+  } catch (err) {
+    showToast('Failed to delete invoice: ' + err.message, '❌');
+  }
+}
+
 async function clearAllDemoData() {
   if (window.AuthSecurity && !window.AuthSecurity.isOwner()) {
-    const authorized = await window.AuthSecurity.requestOwnerOverride('Manager Database Reset', 'Clearing demo data requires Owner PIN authorization.');
+    const authorized = await window.AuthSecurity.requestOwnerRole('Authorize Database Reset');
     if (!authorized) {
       showToast('Owner PIN required for database reset.', '🔒');
       return;
     }
   }
-  if (!confirm('Are you sure you want to remove all sample demo products and start with a completely empty shop?')) return;
+  if (!confirm('⚠️ WARNING: This will permanently wipe ALL products, phone handsets, invoices, and sales reports from Cloud & Device to start with a fresh, completely clean shop.\n\nAre you sure you want to proceed?')) return;
   try {
+    showToast('Clearing all shop data...', '⏳');
     const res = await fetch('/api/admin/reset-demo-data', { method: 'POST' });
     const data = await res.json();
-    showToast(data.message || 'Demo data cleared', '🧹');
-    loadPosCatalog();
-    loadAccessoriesTable();
-    loadPhonesTable();
-    if (state.activeTab === 'reports') loadReports();
+    showToast(data.message || 'All shop data cleared!', '🧹');
+    
+    // Refresh all views immediately
+    if (typeof loadPosCatalog === 'function') loadPosCatalog();
+    if (typeof loadAccessoriesTable === 'function') loadAccessoriesTable();
+    if (typeof loadPhonesTable === 'function') loadPhonesTable();
+    if (typeof loadOrdersTable === 'function') loadOrdersTable();
+    if (typeof loadReports === 'function') loadReports();
+    if (typeof updateOutOfStockBadge === 'function') updateOutOfStockBadge();
   } catch (err) {
-    showToast('Failed to reset data', '❌');
+    showToast('Failed to reset data: ' + err.message, '❌');
   }
 }
 
