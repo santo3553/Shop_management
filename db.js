@@ -152,6 +152,8 @@ function initSchema() {
       customer_nid TEXT DEFAULT '',
       guarantor_info TEXT DEFAULT '',
       emi_status TEXT DEFAULT '',
+      status TEXT DEFAULT 'COMPLETED',
+      void_reason TEXT DEFAULT '',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -281,6 +283,14 @@ try {
   db.exec("ALTER TABLE phones ADD COLUMN warranty_type TEXT DEFAULT 'Official 1-Year'");
 } catch (_) {}
 
+try {
+  db.exec("ALTER TABLE orders ADD COLUMN status TEXT DEFAULT 'COMPLETED'");
+} catch (_) {}
+
+try {
+  db.exec("ALTER TABLE orders ADD COLUMN void_reason TEXT DEFAULT ''");
+} catch (_) {}
+
 // Migrate orders table for EMI payment method check constraint if needed
 try {
   const ordersMaster = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='orders'").get();
@@ -311,11 +321,13 @@ try {
           customer_nid TEXT DEFAULT '',
           guarantor_info TEXT DEFAULT '',
           emi_status TEXT DEFAULT '',
+          status TEXT DEFAULT 'COMPLETED',
+          void_reason TEXT DEFAULT '',
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
 
-        INSERT INTO orders_migrated (id, invoice_number, customer_name, customer_phone, payment_method, subtotal, discount, total_amount, total_cost, profit_margin, notes, created_at)
-        SELECT id, invoice_number, customer_name, customer_phone, payment_method, subtotal, discount, total_amount, total_cost, profit_margin, notes, created_at
+        INSERT INTO orders_migrated (id, invoice_number, customer_name, customer_phone, payment_method, subtotal, discount, total_amount, total_cost, profit_margin, notes, is_emi, emi_type, emi_bank_name, emi_card_last4, emi_tenure_months, emi_down_payment, emi_monthly_amount, emi_remaining_due, customer_nid, guarantor_info, emi_status, status, void_reason, created_at)
+        SELECT id, invoice_number, customer_name, customer_phone, payment_method, subtotal, discount, total_amount, total_cost, profit_margin, notes, is_emi, emi_type, emi_bank_name, emi_card_last4, emi_tenure_months, emi_down_payment, emi_monthly_amount, emi_remaining_due, customer_nid, guarantor_info, emi_status, COALESCE(status, 'COMPLETED'), COALESCE(void_reason, ''), created_at
         FROM orders;
 
         DROP TABLE orders;

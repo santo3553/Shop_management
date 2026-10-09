@@ -627,7 +627,7 @@ app.post('/api/orders/:id/void', (req, res) => {
       for (const it of items) {
         if (it.item_type === 'phone' || it.imei) {
           const imei = it.imei || it.sku_or_imei;
-          if (imei) db.prepare("UPDATE phones SET status = 'In-Stock', sold_at = NULL, order_id = NULL WHERE imei_number = ?").run(imei);
+          if (imei) db.prepare("UPDATE phones SET status = 'In-Stock', sold_at = NULL WHERE imei_number = ?").run(imei);
         } else if (it.item_id) {
           db.prepare('UPDATE items SET stock_quantity = stock_quantity + ? WHERE id = ?').run(it.quantity || 1, it.item_id);
         }
